@@ -1,18 +1,37 @@
-# PhoneLink M393 — כלי אבחון Bluetooth
+# PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת את מצב Bluetooth במכשיר Android: מכשירים משויכים, שירותי HFP Headset ו-A2DP, והתקני שמע שהמערכת מדווחת ככניסות ויציאות.
+האפליקציה בודקת:
+- דגם וגרסת Android.
+- מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
+- חיבורי פרופיל HFP Headset ו-A2DP שהנגן חושף.
+- התקני שמע לכניסה/יציאה והתקני תקשורת הזמינים ל-Android.
+- בקשת בחירת התקן תקשורת דרך AudioManager.setCommunicationDevice (Android 12+).
+- צליל בדיקה ומדידת עוצמת מיקרופון מקומית ל-3 שניות; לא נשמר קובץ שמע.
 
-## חשוב
-זוהי גרסת אבחון בלבד. היא אינה מחייגת, אינה עונה לשיחות ואינה מנתבת שיחה מהטלפון הכשר לאוזניות. Android אינו מספק לאפליקציה רגילה API ציבורי מלא להפוך את הנגן ל-HFP Client מול טלפון. אין הבטחה שתכונת PhoneLink המבוקשת אפשרית ב-ROM של M393 לפני בדיקה פיזית.
+## מה האפליקציה לא עושה
+- לא מחייגת ולא עונה לשיחות.
+- לא הופכת את הנגן ל-HFP Hands-Free Client מול הטלפון.
+- לא מעבירה שיחת HFP שמגיעה מהטלפון לאוזניות. בדיקת setCommunicationDevice היא עבור נתיב התקשורת של האפליקציה בלבד, ואינה מוכיחה ניתוב שיחת מערכת.
+
+## מגבלה עיקרית
+ב-AOSP, BluetoothHeadsetClient מסומן @SystemApi ו-@hide; פעולות רבות שלו דורשות BLUETOOTH_PRIVILEGED. אפליקציה רגילה מחנות אינה יכולה להסתמך על API זה. כדי שהנגן ישמש דיבורית מול הטלפון נדרשת תמיכת HFP Client ב-ROM/קושחה, ולעיתים אפליקציית מערכת חתומה/הרשאות privileged. גם אם HFP Client קיים, יש לבדוק האם ה-ROM תומך בו במקביל ל-HFP Headset מול אוזניות.
+
+## בדיקה פיזית נדרשת
+1. שייך את הטלפון הכשר ואת אוזניות ה-Bluetooth דרך הגדרות המערכת.
+2. פתח PhoneLink ואשר Nearby devices.
+3. לחץ על בדיקת מצב; בדוק אם האוזניות מופיעות תחת HFP Headset ולא רק תחת A2DP.
+4. לחץ סריקה כדי לבדוק גילוי.
+5. רענן התקני שמע לשיחה. אם מופיע Bluetooth SCO/HFP, בחר אותו ובקש מעבר.
+6. השמע צליל בדיקה ובדוק היכן הוא נשמע; לאחר מכן הרץ בדיקת מיקרופון.
+7. שלח את הדוח ואת דגם הטלפון הכשר המדויק. אין להזין או לשתף מספרי טלפון או מידע אישי.
 
 ## בנייה
-GitHub Actions בונה APK מסוג debug בכל push ל-main או בהפעלה ידנית. הקובץ נשמר כ-artifact בשם phonelink-m393-diagnostic-apk.
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33.
+GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
-## בדיקה
-1. התקן את ה-APK על נגן M393.
-2. אשר הרשאת Nearby devices.
-3. שייך את הטלפון ואת אוזניות ה-Bluetooth דרך הגדרות Android.
-4. חבר את האוזניות, פתח את PhoneLink ולחץ "בדוק שוב".
-5. העבר את דוח האבחון כדי שנוכל לבדוק את התמיכה בפועל.
-
-הגדרות: minSdk 26, targetSdk 33, compileSdk 35, Java 17.
+## מקורות טכניים
+- Android Bluetooth permissions: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions
+- BluetoothHeadset public API: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
+- BluetoothHeadsetClient AOSP System API: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/framework/java/android/bluetooth/BluetoothHeadsetClient.java
+- AudioManager communication routing: https://developer.android.com/reference/android/media/AudioManager
+- Android self-managed audio routing guide: https://developer.android.com/develop/connectivity/bluetooth/ble-audio/audio-manager
