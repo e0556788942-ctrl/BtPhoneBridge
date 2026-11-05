@@ -1,0 +1,7 @@
+build_apk:
+  image: mingc/android-build-box:latest
+  script:
+    - gradle assembleDebug --no-daemon
+  artifacts:
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
