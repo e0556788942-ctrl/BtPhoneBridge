@@ -35,3 +35,10 @@ GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בש�
 - BluetoothHeadsetClient AOSP System API: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/framework/java/android/bluetooth/BluetoothHeadsetClient.java
 - AudioManager communication routing: https://developer.android.com/reference/android/media/AudioManager
 - Android self-managed audio routing guide: https://developer.android.com/develop/connectivity/bluetooth/ble-audio/audio-manager
+
+## הוראות בנייה מקומיות
+ב-ZIP המקור שמופק ב-GitHub Actions כלולים גם Gradle Wrapper וקובצי הפרויקט:
+- Windows: פתח תיקייה בטרמינל והרץ `gradlew.bat assembleDebug`.
+- Linux/macOS: הרץ `./gradlew assembleDebug`.
+- Android Studio: בחר Open, פתח את תיקיית הפרויקט, המתן ל-Gradle Sync ואז Build > Build APK(s).
+ה-APK יופיע ב-`app/build/outputs/apk/debug/app-debug.apk`.
