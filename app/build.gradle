@@ -1,0 +1,14 @@
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'com.phonelink.m393'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.phonelink.m393'
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName '0.1-diagnostic'
+    }
+}
