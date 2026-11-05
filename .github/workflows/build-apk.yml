@@ -27,10 +27,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.9 --distribution-type bin
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Package source project
+        run: |
+          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
       - uses: actions/upload-artifact@v4
         with:
           name: phonelink-m393-diagnostic-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phonelink-m393-source
+          path: PhoneLink_M393_Source.zip
           if-no-files-found: error
