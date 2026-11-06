@@ -7,6 +7,7 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.media.*;
 import android.os.Build;
+import android.os.ParcelUuid;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -24,6 +25,7 @@ public class MainActivity extends Activity {
     private Spinner routeSpinner;
     private final StringBuilder report = new StringBuilder();
     private final Set<String> discovered = new LinkedHashSet<>();
+    private final Set<String> uuidRequests = new HashSet<>();
     private final List<AudioDeviceInfo> communicationDevices = new ArrayList<>();
     private boolean receiverRegistered;
     private boolean profilesRequested;
@@ -51,6 +53,15 @@ public class MainActivity extends Activity {
                 append("סריקת Bluetooth התחילה…");
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 append("סריקת Bluetooth הסתיימה.");
+            } else if (BluetoothDevice.ACTION_UUID.equals(action)) {
+                BluetoothDevice device;
+                if (Build.VERSION.SDK_INT >= 33) {
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
+                } else {
+                    //noinspection deprecation
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                }
+                if (device != null) appendPeerUuidReport(device, device.getUuids(), "תוצאת גילוי SDP");
             }
             showReport();
         }
@@ -109,6 +120,7 @@ public class MainActivity extends Activity {
         addButton(root, "נקה בחירת נתיב שמע", v -> clearCommunicationDevice());
         addButton(root, "השמע צליל בדיקה קצר", v -> playTestTone());
         addButton(root, "בדיקת מיקרופון ל-3 שניות (לא נשמר)", v -> requestMicPermissionAndTest());
+        addButton(root, "העתק דוח אבחון", v -> copyReport());
 
         TextView note = new TextView(this);
         note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. בדיקת נתיב השמע בודקת את נתיב התקשורת של האפליקציה בלבד; היא אינה מגשרת שיחת HFP מהטלפון אל האוזניות.");
@@ -136,6 +148,7 @@ public class MainActivity extends Activity {
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        filter.addAction(BluetoothDevice.ACTION_UUID);
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(discoveryReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
@@ -200,6 +213,7 @@ public class MainActivity extends Activity {
             if (bonded.isEmpty()) line("אין מכשירים משויכים. שייך את הטלפון ואת האוזניות בהגדרות.");
             for (BluetoothDevice d : bonded) {
                 line("• " + safeName(d) + " · סוג התקן: " + d.getType() + " · שיוך: " + d.getBondState());
+                requestPeerUuidCheck(d);
             }
         } catch (SecurityException e) {
             line("גישה ל-Bluetooth נחסמה: " + e.getMessage());
@@ -220,7 +234,10 @@ public class MainActivity extends Activity {
     }
 
     private void requestProfileProxies() {
-        if (adapter == null || !hasBtPermission() || profilesRequested) return;
+        if (adapter == null || !hasBtPermission()) return;
+        if (headsetProxy != null) appendProfile("HFP Headset (הנגן מול אוזניות)", headsetProxy);
+        if (a2dpProxy != null) appendProfile("A2DP (מדיה)", a2dpProxy);
+        if (profilesRequested) return;
         profilesRequested = true;
         BluetoothProfile.ServiceListener listener = new BluetoothProfile.ServiceListener() {
             @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
@@ -234,6 +251,9 @@ public class MainActivity extends Activity {
                 showReport();
             }
             @Override public void onServiceDisconnected(int profile) {
+                if (profile == BluetoothProfile.HEADSET) headsetProxy = null;
+                if (profile == BluetoothProfile.A2DP) a2dpProxy = null;
+                profilesRequested = false;
                 append("שירות Bluetooth נותק: " + profile);
                 showReport();
             }
@@ -326,6 +346,12 @@ public class MainActivity extends Activity {
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
             boolean accepted = audioManager.setCommunicationDevice(device);
             append("בקשת ניתוב ל-" + device.getProductName() + ": " + (accepted ? "התקבלה; יש לאמת בפועל." : "נדחתה."));
+            new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                AudioDeviceInfo actual = audioManager.getCommunicationDevice();
+                append("התקן תקשורת שנבחר לפי Android: " +
+                    (actual == null ? "לא דווח התקן נבחר." : actual.getProductName() + " · " + audioType(actual.getType())));
+                showReport();
+            }, 700);
         } catch (Exception e) {
             append("שגיאה בבחירת נתיב: " + e.getMessage());
         }
@@ -453,9 +479,58 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void requestPeerUuidCheck(BluetoothDevice device) {
+        try {
+            ParcelUuid[] cached = device.getUuids();
+            if (cached != null && cached.length > 0) appendPeerUuidReport(device, cached, "UUID שמורים");
+            else append("UUID של " + safeName(device) + ": אין מידע שמור עדיין; נשלחת בקשת SDP.");
+            String key = device.getAddress();
+            if (uuidRequests.add(key)) {
+                boolean started = device.fetchUuidsWithSdp();
+                append("בקשת גילוי שירותי SDP עבור " + safeName(device) + ": " + (started ? "נשלחה; התוצאה תופיע בהמשך." : "לא התחילה."));
+            }
+        } catch (SecurityException e) {
+            append("אין הרשאה לקרוא UUID של " + safeName(device) + ": " + e.getMessage());
+        }
+    }
+
+    private void appendPeerUuidReport(BluetoothDevice device, ParcelUuid[] uuids, String source) {
+        append("");
+        append(source + " של " + safeName(device) + ":");
+        if (uuids == null || uuids.length == 0) {
+            append("לא התקבלו UUID. תוצאה זו אינה הוכחה שהפרופיל אינו נתמך.");
+            return;
+        }
+        boolean hfpAg = false, hfpHf = false, hspAg = false, hspHs = false, a2dpSink = false;
+        for (ParcelUuid parcelUuid : uuids) {
+            String id = parcelUuid.toString().toLowerCase(Locale.US);
+            String label = "שירות Bluetooth אחר";
+            if (id.equals("0000111f-0000-1000-8000-00805f9b34fb")) { label = "HFP Audio Gateway (תפקיד טלפון/AG)"; hfpAg = true; }
+            else if (id.equals("0000111e-0000-1000-8000-00805f9b34fb")) { label = "HFP Hands-Free (תפקיד דיבורית/HF)"; hfpHf = true; }
+            else if (id.equals("00001112-0000-1000-8000-00805f9b34fb")) { label = "HSP Audio Gateway (AG)"; hspAg = true; }
+            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset (אוזנייה/HS)"; hspHs = true; }
+            else if (id.equals("0000110b-0000-1000-8000-00805f9b34fb")) { label = "A2DP Audio Sink (יעד מדיה, לרוב אוזניות)"; a2dpSink = true; }
+            else if (id.equals("0000110a-0000-1000-8000-00805f9b34fb")) label = "A2DP Audio Source (מקור מדיה)";
+            append("• " + id + " — " + label);
+        }
+        if (hfpAg || hspAg) append("ממצא: ההתקן מפרסם תפקיד Audio Gateway; זה סימן חיובי לטלפון שמולו הנגן אמור להיות Hands-Free.");
+        if (hfpHf || hspHs) append("ממצא: ההתקן מפרסם תפקיד Hands-Free/Headset; זה סימן חיובי לאוזניות.");
+        if (a2dpSink) append("ממצא: ההתקן מפרסם A2DP Sink, תפקיד נפוץ באוזניות מדיה.");
+        append("הערה: UUID מסייע לזהות תפקידים שההתקן מפרסם, אך אינו מוכיח שחיבור, שמע דו-כיווני או עבודה בו-זמנית יתאפשרו.");
+    }
+
+    private void copyReport() {
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) return;
+        clipboard.setPrimaryClip(ClipData.newPlainText("PhoneLink diagnostic report", report.toString()));
+        Toast.makeText(this, "דוח האבחון הועתק", Toast.LENGTH_SHORT).show();
+    }
+
     private String safeName(BluetoothDevice d) {
-        try { return String.valueOf(d.getName()) + " · " + d.getAddress(); }
-        catch (Exception e) { return "התקן Bluetooth"; }
+        try {
+            String name = d.getName();
+            return name == null || name.trim().isEmpty() ? "מכשיר Bluetooth" : name;
+        } catch (Exception e) { return "מכשיר Bluetooth"; }
     }
     private void line(String s) { report.append(s).append('\n'); }
     private void append(String s) { report.append(s).append('\n'); }
