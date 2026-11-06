@@ -508,7 +508,7 @@ public class MainActivity extends Activity {
             if (id.equals("0000111f-0000-1000-8000-00805f9b34fb")) { label = "HFP Audio Gateway (תפקיד טלפון/AG)"; hfpAg = true; }
             else if (id.equals("0000111e-0000-1000-8000-00805f9b34fb")) { label = "HFP Hands-Free (תפקיד דיבורית/HF)"; hfpHf = true; }
             else if (id.equals("00001112-0000-1000-8000-00805f9b34fb")) { label = "HSP Audio Gateway (AG)"; hspAg = true; }
-            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset (אוזנייה/HS)"; hspHs = true; }
+            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb") || id.equals("00001131-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset (אוזנייה/HS)"; hspHs = true; }
             else if (id.equals("0000110b-0000-1000-8000-00805f9b34fb")) { label = "A2DP Audio Sink (יעד מדיה, לרוב אוזניות)"; a2dpSink = true; }
             else if (id.equals("0000110a-0000-1000-8000-00805f9b34fb")) label = "A2DP Audio Source (מקור מדיה)";
             append("• " + id + " — " + label);
