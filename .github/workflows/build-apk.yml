@@ -33,7 +33,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
       - name: Package source project
         run: |
-          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
+          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md docs/FEASIBILITY_HE.md .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
       - uses: actions/upload-artifact@v4
         with:
           name: phonelink-m393-diagnostic-apk
