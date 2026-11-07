@@ -55,13 +55,27 @@ public class MainActivity extends Activity {
                 append("סריקת Bluetooth הסתיימה.");
             } else if (BluetoothDevice.ACTION_UUID.equals(action)) {
                 BluetoothDevice device;
+                ParcelUuid[] uuids;
                 if (Build.VERSION.SDK_INT >= 33) {
                     device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
+                    uuids = intent.getParcelableArrayExtra(BluetoothDevice.EXTRA_UUID, ParcelUuid.class);
                 } else {
                     //noinspection deprecation
                     device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    //noinspection deprecation
+                    android.os.Parcelable[] raw = intent.getParcelableArrayExtra(BluetoothDevice.EXTRA_UUID);
+                    uuids = null;
+                    if (raw != null) {
+                        uuids = new ParcelUuid[raw.length];
+                        for (int i = 0; i < raw.length; i++) {
+                            if (raw[i] instanceof ParcelUuid) uuids[i] = (ParcelUuid) raw[i];
+                        }
+                    }
                 }
-                if (device != null) appendPeerUuidReport(device, device.getUuids(), "תוצאת גילוי SDP");
+                if (device != null) {
+                    try { uuidRequests.remove(device.getAddress()); } catch (SecurityException ignored) {}
+                    appendPeerUuidReport(device, uuids, "תוצאת גילוי SDP");
+                }
             }
             showReport();
         }
@@ -194,6 +208,12 @@ public class MainActivity extends Activity {
         report.setLength(0);
         line("PHONE LINK · דוח אבחון");
         line("Android API: " + Build.VERSION.SDK_INT + " · דגם: " + Build.MODEL);
+        PackageManager pm = getPackageManager();
+        line("יכולות מערכת:");
+        line("• Bluetooth Classic: " + pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH));
+        line("• Bluetooth LE: " + pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE));
+        line("• Telephony feature: " + pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY));
+        line("• מיקרופון: " + pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE));
         if (adapter == null) {
             line("לא נמצא מתאם Bluetooth.");
             showReport();
@@ -497,8 +517,12 @@ public class MainActivity extends Activity {
     private void appendPeerUuidReport(BluetoothDevice device, ParcelUuid[] uuids, String source) {
         append("");
         append(source + " של " + safeName(device) + ":");
-        if (uuids == null || uuids.length == 0) {
-            append("לא התקבלו UUID. תוצאה זו אינה הוכחה שהפרופיל אינו נתמך.");
+        if (uuids == null) {
+            append("לא התקבלה רשימת UUID (ייתכן timeout או כשל SDP). אין להסיק מכך שאין תמיכה.");
+            return;
+        }
+        if (uuids.length == 0) {
+            append("גילוי SDP הסתיים ללא UUID. גם זו אינה הוכחה מוחלטת שאין תמיכה.");
             return;
         }
         boolean hfpAg = false, hfpHf = false, hspAg = false, hspHs = false, a2dpSink = false;
@@ -508,7 +532,8 @@ public class MainActivity extends Activity {
             if (id.equals("0000111f-0000-1000-8000-00805f9b34fb")) { label = "HFP Audio Gateway (תפקיד טלפון/AG)"; hfpAg = true; }
             else if (id.equals("0000111e-0000-1000-8000-00805f9b34fb")) { label = "HFP Hands-Free (תפקיד דיבורית/HF)"; hfpHf = true; }
             else if (id.equals("00001112-0000-1000-8000-00805f9b34fb")) { label = "HSP Audio Gateway (AG)"; hspAg = true; }
-            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb") || id.equals("00001131-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset (אוזנייה/HS)"; hspHs = true; }
+            else if (id.equals("00001131-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset - HS (תפקיד אוזנייה)"; hspHs = true; }
+            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb")) { label = "Headset service class (HSP; נדרש אימות מול שאר ה-SDP)"; hspHs = true; }
             else if (id.equals("0000110b-0000-1000-8000-00805f9b34fb")) { label = "A2DP Audio Sink (יעד מדיה, לרוב אוזניות)"; a2dpSink = true; }
             else if (id.equals("0000110a-0000-1000-8000-00805f9b34fb")) label = "A2DP Audio Source (מקור מדיה)";
             append("• " + id + " — " + label);
