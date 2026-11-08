@@ -17,6 +17,7 @@ import java.util.*;
 public class MainActivity extends Activity {
     private static final int REQ_BT = 42;
     private static final int REQ_MIC = 43;
+    private static final int REQ_LEGACY_LOCATION = 44;
     private BluetoothAdapter adapter;
     private BluetoothHeadset headsetProxy;
     private BluetoothA2dp a2dpProxy;
@@ -33,6 +34,8 @@ public class MainActivity extends Activity {
     private AudioTrack testTrack;
     private AudioRecord audioRecord;
     private volatile boolean micRunning;
+    private AudioDeviceCallback audioDeviceCallback;
+    private AudioManager.OnCommunicationDeviceChangedListener communicationListener;
 
     private final BroadcastReceiver discoveryReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -87,6 +90,7 @@ public class MainActivity extends Activity {
         audioManager = (AudioManager)getSystemService(AUDIO_SERVICE);
         buildUi();
         registerDiscoveryReceiver();
+        registerAudioCallbacks();
         requestBluetoothPermissions();
     }
 
@@ -182,6 +186,10 @@ public class MainActivity extends Activity {
                 requestPermissions(missing.toArray(new String[0]), REQ_BT);
                 return;
             }
+        } else if (Build.VERSION.SDK_INT >= 23 &&
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
+            return;
         }
         runDiagnostics();
     }
@@ -193,6 +201,11 @@ public class MainActivity extends Activity {
             for (int result : results) granted &= result == PackageManager.PERMISSION_GRANTED;
             if (granted) runDiagnostics();
             else { append("נדרשת הרשאת Nearby devices כדי לבדוק Bluetooth."); showReport(); }
+        } else if (code == REQ_LEGACY_LOCATION) {
+            append(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED
+                ? "הרשאת מיקום אושרה; היא נדרשת לסריקת Bluetooth בגרסאות Android 8–11."
+                : "הרשאת מיקום לא אושרה; ב-Android 8–11 ייתכן שלא ניתן יהיה לסרוק התקנים. התקנים משויכים עדיין ניתנים לבדיקה.");
+            runDiagnostics();
         } else if (code == REQ_MIC) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) runMicTest();
             else { append("הרשאת מיקרופון לא אושרה; לא בוצעה בדיקת מיקרופון."); showReport(); }
@@ -202,6 +215,39 @@ public class MainActivity extends Activity {
     private boolean hasBtPermission() {
         return Build.VERSION.SDK_INT < 31 ||
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasScanPermission() {
+        if (Build.VERSION.SDK_INT >= 31)
+            return checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+        return Build.VERSION.SDK_INT < 23 ||
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void registerAudioCallbacks() {
+        if (audioManager == null) return;
+        audioDeviceCallback = new AudioDeviceCallback() {
+            @Override public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
+                append("מערכת השמע דיווחה על התקן/ים שנוספו:");
+                appendAudio(added, "נוסף");
+                refreshCommunicationDevices();
+            }
+            @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
+                append("מערכת השמע דיווחה על התקן/ים שנותקו:");
+                appendAudio(removed, "נותק");
+                refreshCommunicationDevices();
+            }
+        };
+        audioManager.registerAudioDeviceCallback(audioDeviceCallback, new android.os.Handler(getMainLooper()));
+        if (Build.VERSION.SDK_INT >= 31) {
+            communicationListener = device -> {
+                append("Android דיווח על שינוי נתיב תקשורת: " +
+                    (device == null ? "אין התקן תקשורת נבחר" : device.getProductName() + " · " + audioType(device.getType())));
+                appendAudio(audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS), "כניסות לאחר שינוי נתיב");
+                showReport();
+            };
+            audioManager.addOnCommunicationDeviceChangedListener(getMainExecutor(), communicationListener);
+        }
     }
 
     private void runDiagnostics() {
@@ -304,9 +350,11 @@ public class MainActivity extends Activity {
             showReport();
             return;
         }
-        if (Build.VERSION.SDK_INT >= 31 &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT);
+        if (!hasScanPermission()) {
+            if (Build.VERSION.SDK_INT >= 31)
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT);
+            else
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
             return;
         }
         try {
@@ -370,6 +418,7 @@ public class MainActivity extends Activity {
                 AudioDeviceInfo actual = audioManager.getCommunicationDevice();
                 append("התקן תקשורת שנבחר לפי Android: " +
                     (actual == null ? "לא דווח התקן נבחר." : actual.getProductName() + " · " + audioType(actual.getType())));
+                appendAudio(audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS), "כניסות שמע לאחר בחירת נתיב");
                 showReport();
             }, 700);
         } catch (Exception e) {
@@ -568,7 +617,13 @@ public class MainActivity extends Activity {
         if (receiverRegistered) {
             try { unregisterReceiver(discoveryReceiver); } catch (Exception ignored) {}
         }
+        if (audioManager != null && audioDeviceCallback != null) {
+            try { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback); } catch (Exception ignored) {}
+        }
         if (Build.VERSION.SDK_INT >= 31 && audioManager != null) {
+            if (communicationListener != null) {
+                try { audioManager.removeOnCommunicationDeviceChangedListener(communicationListener); } catch (Exception ignored) {}
+            }
             try { audioManager.clearCommunicationDevice(); audioManager.setMode(AudioManager.MODE_NORMAL); } catch (Exception ignored) {}
         }
         try {
