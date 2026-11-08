@@ -202,10 +202,11 @@ public class MainActivity extends Activity {
             if (granted) runDiagnostics();
             else { append("נדרשת הרשאת Nearby devices כדי לבדוק Bluetooth."); showReport(); }
         } else if (code == REQ_LEGACY_LOCATION) {
+            runDiagnostics();
             append(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED
                 ? "הרשאת מיקום אושרה; היא נדרשת לסריקת Bluetooth בגרסאות Android 8–11."
                 : "הרשאת מיקום לא אושרה; ב-Android 8–11 ייתכן שלא ניתן יהיה לסרוק התקנים. התקנים משויכים עדיין ניתנים לבדיקה.");
-            runDiagnostics();
+            showReport();
         } else if (code == REQ_MIC) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) runMicTest();
             else { append("הרשאת מיקרופון לא אושרה; לא בוצעה בדיקת מיקרופון."); showReport(); }
