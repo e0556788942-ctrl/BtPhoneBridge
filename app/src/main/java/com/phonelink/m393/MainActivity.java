@@ -9,6 +9,8 @@ import android.media.*;
 import android.os.Build;
 import android.os.ParcelUuid;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.widget.*;
@@ -27,6 +29,8 @@ public class MainActivity extends Activity {
     private final StringBuilder report = new StringBuilder();
     private final Set<String> discovered = new LinkedHashSet<>();
     private final Set<String> uuidRequests = new HashSet<>();
+    private final Map<String, Runnable> uuidTimeouts = new HashMap<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<AudioDeviceInfo> communicationDevices = new ArrayList<>();
     private boolean receiverRegistered;
     private boolean profilesRequested;
@@ -76,7 +80,12 @@ public class MainActivity extends Activity {
                     }
                 }
                 if (device != null) {
-                    try { uuidRequests.remove(device.getAddress()); } catch (SecurityException ignored) {}
+                    try {
+                        String address = device.getAddress();
+                        uuidRequests.remove(address);
+                        Runnable timeout = uuidTimeouts.remove(address);
+                        if (timeout != null) mainHandler.removeCallbacks(timeout);
+                    } catch (SecurityException ignored) {}
                     appendPeerUuidReport(device, uuids, "תוצאת גילוי SDP");
                 }
             }
@@ -168,7 +177,7 @@ public class MainActivity extends Activity {
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_UUID);
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(discoveryReceiver, filter, Context.RECEIVER_EXPORTED);
+            registerReceiver(discoveryReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(discoveryReceiver, filter);
         }
@@ -291,6 +300,7 @@ public class MainActivity extends Activity {
         line("HFP Headset = הנגן כ-AG מול אוזניות HF; A2DP = שמע מדיה.");
         line("הם אינם מוכיחים שהנגן תומך ב-HFP Client מול הטלפון.");
         line("HFP Client הוא תפקיד נפרד שנדרש כדי שהנגן יופיע לטלפון כדיבורית.");
+        line("אין API ציבורי לאפליקציה רגילה שמאמת את מצב HFP Client המקומי של ה-ROM; UUID של הטלפון לבדו אינו מספיק.");
         requestProfileProxies();
         appendAudioInventory();
         refreshCommunicationDevices();
@@ -550,16 +560,35 @@ public class MainActivity extends Activity {
     }
 
     private void requestPeerUuidCheck(BluetoothDevice device) {
+        String key = null;
         try {
             ParcelUuid[] cached = device.getUuids();
             if (cached != null && cached.length > 0) appendPeerUuidReport(device, cached, "UUID שמורים");
             else append("UUID של " + safeName(device) + ": אין מידע שמור עדיין; נשלחת בקשת SDP.");
-            String key = device.getAddress();
+            key = device.getAddress();
             if (uuidRequests.add(key)) {
                 boolean started = device.fetchUuidsWithSdp();
-                append("בקשת גילוי שירותי SDP עבור " + safeName(device) + ": " + (started ? "נשלחה; התוצאה תופיע בהמשך." : "לא התחילה."));
+                if (started) {
+                    final String requestKey = key;
+                    Runnable timeout = () -> {
+                        uuidRequests.remove(requestKey);
+                        uuidTimeouts.remove(requestKey);
+                        append("לא התקבלה תשובת SDP עבור " + safeName(device) +
+                            " בתוך 15 שניות. אין להסיק מכך שאין תמיכה; אפשר ללחוץ שוב על בדיקת מצב.");
+                        showReport();
+                    };
+                    uuidTimeouts.put(key, timeout);
+                    mainHandler.postDelayed(timeout, 15000);
+                    append("בקשת גילוי שירותי SDP עבור " + safeName(device) + ": נשלחה; ממתין עד 15 שניות.");
+                } else {
+                    uuidRequests.remove(key);
+                    append("בקשת גילוי שירותי SDP עבור " + safeName(device) + " לא התחילה; ניתן לנסות שוב.");
+                }
+            } else {
+                append("בקשת SDP עבור " + safeName(device) + " כבר ממתינה לתוצאה.");
             }
         } catch (SecurityException e) {
+            if (key != null) uuidRequests.remove(key);
             append("אין הרשאה לקרוא UUID של " + safeName(device) + ": " + e.getMessage());
         }
     }
@@ -614,6 +643,9 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         micRunning = false;
+        for (Runnable timeout : uuidTimeouts.values()) mainHandler.removeCallbacks(timeout);
+        uuidTimeouts.clear();
+        uuidRequests.clear();
         try { if (adapter != null && adapter.isDiscovering()) adapter.cancelDiscovery(); } catch (Exception ignored) {}
         if (receiverRegistered) {
             try { unregisterReceiver(discoveryReceiver); } catch (Exception ignored) {}
