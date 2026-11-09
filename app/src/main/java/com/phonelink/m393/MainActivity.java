@@ -607,14 +607,12 @@ public class MainActivity extends Activity {
         boolean hfpAg = false, hfpHf = false, hspAg = false, hspHs = false, a2dpSink = false;
         for (ParcelUuid parcelUuid : uuids) {
             String id = parcelUuid.toString().toLowerCase(Locale.US);
-            String label = "שירות Bluetooth אחר";
-            if (id.equals("0000111f-0000-1000-8000-00805f9b34fb")) { label = "HFP Audio Gateway (תפקיד טלפון/AG)"; hfpAg = true; }
-            else if (id.equals("0000111e-0000-1000-8000-00805f9b34fb")) { label = "HFP Hands-Free (תפקיד דיבורית/HF)"; hfpHf = true; }
-            else if (id.equals("00001112-0000-1000-8000-00805f9b34fb")) { label = "HSP Audio Gateway (AG)"; hspAg = true; }
-            else if (id.equals("00001131-0000-1000-8000-00805f9b34fb")) { label = "HSP Headset - HS (תפקיד אוזנייה)"; hspHs = true; }
-            else if (id.equals("00001108-0000-1000-8000-00805f9b34fb")) { label = "Headset service class (HSP; נדרש אימות מול שאר ה-SDP)"; hspHs = true; }
-            else if (id.equals("0000110b-0000-1000-8000-00805f9b34fb")) { label = "A2DP Audio Sink (יעד מדיה, לרוב אוזניות)"; a2dpSink = true; }
-            else if (id.equals("0000110a-0000-1000-8000-00805f9b34fb")) label = "A2DP Audio Source (מקור מדיה)";
+            String label = BluetoothServiceUuid.label(id);
+            hfpAg |= BluetoothServiceUuid.isHfpAudioGateway(id);
+            hfpHf |= BluetoothServiceUuid.isHfpHandsFree(id);
+            hspAg |= BluetoothServiceUuid.isHspAudioGateway(id);
+            hspHs |= BluetoothServiceUuid.isHspHeadset(id);
+            a2dpSink |= BluetoothServiceUuid.isA2dpSink(id);
             append("• " + id + " — " + label);
         }
         if (hfpAg || hspAg) append("ממצא: ההתקן מפרסם תפקיד Audio Gateway; זה סימן חיובי לטלפון שמולו הנגן אמור להיות Hands-Free.");
