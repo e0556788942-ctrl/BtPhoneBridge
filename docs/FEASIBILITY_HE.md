@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-09
+תאריך עדכון: 2026-11-10
 
 ## מסקנה זמנית
 
@@ -111,3 +111,12 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 - BluetoothHeadset public API: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
 - AOSP BluetoothHeadsetClient source: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/framework/java/android/bluetooth/BluetoothHeadsetClient.java
 - AudioManager communication routing: https://developer.android.com/reference/android/media/AudioManager
+
+
+### תיקון אבטחה וקליטת אירועים בגרסה 0.5 (2026-11-10)
+
+בגרסה 0.4 המקלט הדינמי נרשם עם `RECEIVER_NOT_EXPORTED`. בדיקה מול תיעוד Android גילתה שמקלט כזה עלול לא לקבל שידורים מאפליקציות מערכת בעלות הרשאות גבוהות, כגון Bluetooth, כאשר הן אינן פועלות תחת UID המערכת. הדבר עלול למנוע קבלת `ACTION_FOUND`, `ACTION_DISCOVERY_*` ו-`ACTION_UUID`, ולגרום לסריקה או SDP להיראות כאילו לא התקבלו תוצאות.
+
+בגרסה 0.5 המקלט נרשם כ-`RECEIVER_EXPORTED` ב-Android 13 ומעלה, ובכל הגרסאות הנתמכות הוא מוגן בהרשאת שולח `BLUETOOTH_PRIVILEGED`. כך הוא יכול לקבל שידורים משירות Bluetooth המורשה, תוך צמצום האפשרות שאפליקציה רגילה תזייף אירועים. נדרשת עדיין בדיקה על M393, כי יצרן עשוי לשנות את חבילת Bluetooth או את הרשאותיה.
+
+המקורות: תיעוד Android בנושא [Broadcasts](https://developer.android.com/develop/background-work/background-tasks/broadcasts) מסביר במפורש שיש להשתמש ב-`RECEIVER_EXPORTED` לקבלת שידורים מאפליקציות מערכת בעלות הרשאות גבוהות; מניפסט AOSP של חבילת Bluetooth מבקש `BLUETOOTH_PRIVILEGED`.

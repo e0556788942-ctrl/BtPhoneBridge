@@ -176,10 +176,15 @@ public class MainActivity extends Activity {
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_UUID);
+        // Bluetooth broadcasts are sent by the privileged Bluetooth app UID,
+        // not necessarily by Android's system UID. NOT_EXPORTED can block them.
+        // Export only behind the signature/privileged sender permission.
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(discoveryReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(discoveryReceiver, filter,
+                Manifest.permission.BLUETOOTH_PRIVILEGED, null, Context.RECEIVER_EXPORTED);
         } else {
-            registerReceiver(discoveryReceiver, filter);
+            registerReceiver(discoveryReceiver, filter,
+                Manifest.permission.BLUETOOTH_PRIVILEGED, null);
         }
         receiverRegistered = true;
     }
