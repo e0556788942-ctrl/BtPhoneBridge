@@ -275,6 +275,7 @@ public class MainActivity extends Activity {
         line("• Bluetooth LE: " + pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE));
         line("• Telephony feature: " + pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY));
         line("• מיקרופון: " + pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE));
+        appendHfpClientServiceProbe(pm);
         if (adapter == null) {
             line("לא נמצא מתאם Bluetooth.");
             showReport();
@@ -313,6 +314,54 @@ public class MainActivity extends Activity {
         line("מגבלת Android: BluetoothHeadsetClient הוא System API מוסתר, ומוגן גם ב-BLUETOOTH_PRIVILEGED.");
         line("APK רגיל אינו מקבל הרשאה זו. נדרשת תמיכת ROM/יצרן או אפליקציית מערכת חתומה.");
         showReport();
+    }
+
+
+    /**
+     * Best-effort passive check for the AOSP Bluetooth HFP Client service component.
+     * A declared/enabled component is not proof that the profile is running or usable.
+     */
+    private void appendHfpClientServiceProbe(PackageManager pm) {
+        line("");
+        line("בדיקת רכיב HFP Client במערכת (בדיקה פסיבית):");
+        final String bluetoothPackage = "com.android.bluetooth";
+        try {
+            PackageInfo info;
+            long flags = PackageManager.GET_SERVICES | PackageManager.MATCH_DISABLED_COMPONENTS;
+            if (Build.VERSION.SDK_INT >= 33) {
+                info = pm.getPackageInfo(bluetoothPackage, PackageManager.PackageInfoFlags.of(flags));
+            } else {
+                //noinspection deprecation
+                info = pm.getPackageInfo(bluetoothPackage, (int) flags);
+            }
+            boolean found = false;
+            if (info.services != null) {
+                for (android.content.pm.ServiceInfo service : info.services) {
+                    String name = service.name == null ? "" : service.name;
+                    if (HfpClientServiceDetector.matches(name)) {
+                        found = true;
+                        boolean appEnabled = info.applicationInfo != null && info.applicationInfo.enabled;
+                        boolean effectiveByManifest = service.enabled && appEnabled;
+                        line("נמצא רכיב: " + name);
+                        line("מוצהר כפעיל במניפסט: " + effectiveByManifest);
+                        line(effectiveByManifest
+                            ? "סימן חיובי בלבד: הרכיב מוצהר כפעיל; עדיין לא הוכח ששירות HFP Client עלה או שניתן להתחבר אליו."
+                            : "הרכיב קיים אך מוצהר כמושבת; נדרש שינוי קושחה/overlay של היצרן כדי להפעילו.");
+                    }
+                }
+            }
+            if (!found) {
+                line("לא נמצא רכיב HFP Client בחבילת com.android.bluetooth.");
+                line("ייתכן שהיצרן משתמש בחבילת Bluetooth אחרת; תוצאה זו אינה הוכחה מוחלטת שאין HFP Client.");
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            line("חבילת com.android.bluetooth אינה גלויה/מותקנת בשם זה; ייתכן שם חבילה של יצרן.");
+        } catch (SecurityException e) {
+            line("Android חסם בדיקת רכיבי מערכת: " + e.getMessage());
+        } catch (RuntimeException e) {
+            line("בדיקת רכיב HFP Client לא הושלמה: " + e.getClass().getSimpleName());
+        }
+        line("הבדיקה אינה קוראת API מוסתר, אינה מתחברת לפרופיל ואינה מאמתת שיחות או ניתוב שמע.");
     }
 
     private void requestProfileProxies() {
