@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.bluetooth.*;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageInfo;
 import android.media.*;
 import android.os.Build;
 import android.os.ParcelUuid;
