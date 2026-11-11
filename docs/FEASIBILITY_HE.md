@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-10
+תאריך עדכון: 2026-11-11
 
 ## מסקנה זמנית
 
@@ -28,7 +28,7 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 
 ## מה נבדק בקוד
 
-האבטיפוס הנוכחי:
+האבטיפוס הנוכחי (גרסה 0.6):
 - מציג גרסת Android ודגם.
 - מציג תכונות מערכת: Bluetooth Classic, Bluetooth LE, Telephony ומיקרופון.
 - מציג התקנים משויכים ומאפשר סריקת Bluetooth.
@@ -57,6 +57,10 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 - GitHub Actions מריץ כעת `testDebugUnitTest` לפני יצירת ה-APK. בדיקות היחידה מאמתות את מיפוי ה-UUID בלבד; הן אינן בדיקת Bluetooth או שמע על חומרה.
 
 השיפורים האלה מתקנים מצב שבו בקשת SDP שלא קיבלה תשובה הייתה נשארת מסומנת כממתינה ללא הגבלת זמן, ומשפרים את בטיחות קליטת אירועי המערכת. הם אינם מוסיפים HFP Client ואינם משנים את מגבלות Android.
+
+## שיפור שבוצע בגרסה 0.6 (2026-11-11)
+
+נוספה בדיקה פסיבית של PackageManager עבור שירות HeadsetClientService בחבילת AOSP com.android.bluetooth. היא מדווחת אם הרכיב מופיע ואם הוא מסומן enabled במניפסט. זהו סימן מוקדם בלבד: הרכיב עשוי להיות disabled על ידי resource overlay, או שהיצרן עשוי להשתמש בשם חבילה אחר. גם רכיב enabled אינו מוכיח ששירות הפרופיל רץ, ש-BluetoothHeadsetClient זמין, או ששיחות ו-SCO עובדים. הבדיקה אינה מנסה לקרוא API מוסתר ואינה דורשת BLUETOOTH_PRIVILEGED.
 
 ## שיפור שבוצע בעדכון זה
 - תוצאות SDP נקראות כעת מתוך `BluetoothDevice.EXTRA_UUID` של אירוע `ACTION_UUID`, ולא מתוך cache בלבד.
@@ -120,3 +124,10 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 בגרסה 0.5 המקלט נרשם כ-`RECEIVER_EXPORTED` ב-Android 13 ומעלה, ובכל הגרסאות הנתמכות הוא מוגן בהרשאת שולח `BLUETOOTH_PRIVILEGED`. כך הוא יכול לקבל שידורים משירות Bluetooth המורשה, תוך צמצום האפשרות שאפליקציה רגילה תזייף אירועים. נדרשת עדיין בדיקה על M393, כי יצרן עשוי לשנות את חבילת Bluetooth או את הרשאותיה.
 
 המקורות: תיעוד Android בנושא [Broadcasts](https://developer.android.com/develop/background-work/background-tasks/broadcasts) מסביר במפורש שיש להשתמש ב-`RECEIVER_EXPORTED` לקבלת שידורים מאפליקציות מערכת בעלות הרשאות גבוהות; מניפסט AOSP של חבילת Bluetooth מבקש `BLUETOOTH_PRIVILEGED`.
+
+
+## ממצא ממוקד נוסף ממקור Android 13 AOSP
+
+בקובץ התצורה של Bluetooth בענף Android 13, hfp_client_connection_service_enabled מוגדר כברירת מחדל false, וכך גם שירות החיבור ל-Emergency Calls. זה מתייחס לשילוב HFP Client עם Telecom, ואינו לבדו קובע אם פרופיל HFP Client עצמו מופעל: היצרן יכול לספק overlays ותצורה משלו. לכן יש לבדוק גם את רכיב השירות במכשיר עצמו וגם את התנהגות החיבור. מקור: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/android/app/res/values/config.xml
+
+ה-API הציבורי של Android מתעד את BluetoothHeadset כפרופיל Headset/HFP מול אוזניות, ואינו מספק API ציבורי מקביל מלא לשליטה ב-HFP Client. מקור: https://developer.android.com/develop/connectivity/bluetooth/profiles
