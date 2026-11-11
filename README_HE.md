@@ -1,7 +1,8 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 0.5):
+האפליקציה בודקת (גרסה 0.6):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
+- בדיקה פסיבית אם חבילת com.android.bluetooth מצהירה על רכיב HFP Client בשם HeadsetClientService ואם הוא מסומן פעיל במניפסט; זו אינדיקציה בלבד ולא בדיקת חיבור.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
 - חיבורי פרופיל HFP Headset ו-A2DP שהנגן חושף.
 - גילוי שירותי SDP/UUID של מכשירים משויכים כדי לזהות אם הטלפון מפרסם HFP Audio Gateway ואם האוזניות מפרסמות HFP Hands-Free או HSP Headset. בקשת SDP מקבלת timeout של 15 שניות, ולאחריו ניתן לנסות שוב.
@@ -28,6 +29,10 @@
 7. השמע צליל בדיקה ובדוק היכן הוא נשמע; לאחר מכן הרץ בדיקת מיקרופון.
 8. לחץ העתק דוח אבחון. לפני שיתוף, בדוק שאין בו מידע אישי; האפליקציה מסתירה כתובות MAC. ציין רק את יצרן ודגם הטלפון הכשר.
 
+## בדיקת HFP Client בגרסה 0.6
+
+נוספה בדיקה פסיבית של רכיב HeadsetClientService בחבילת AOSP com.android.bluetooth. האפליקציה מציגה אם הרכיב נמצא ואם הוא מסומן enabled במניפסט. אם חבילת היצרן שונה, ייתכן שהבדיקה לא תמצא אותו. גם רכיב שנמצא ומסומן פעיל אינו הוכחה שהפרופיל עלה, זמין לאפליקציה או מסוגל לנהל שיחה. לא נעשה שימוש ב-API מוסתר ולא נוספה הרשאת מערכת.
+
 ## תיקון חשוב בגרסה 0.5
 
 מקלט אירועי Bluetooth נרשם כעת כ-`RECEIVER_EXPORTED` עם הרשאת שולח `BLUETOOTH_PRIVILEGED`. שירות Bluetooth של Android עשוי לשדר מאפליקציית מערכת בעלת הרשאות גבוהות שאינה רצה ב-UID המערכת; `RECEIVER_NOT_EXPORTED` עלול לחסום אירועי `ACTION_FOUND` ו-`ACTION_UUID`. ההרשאה בצד השולח מצמצמת קבלת שידורים מאפליקציות רגילות. הדבר מתקן את קליטת אירועי הסריקה ותוצאות SDP; הוא אינו מוסיף HFP Client.
@@ -37,7 +42,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33.
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.6.
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
