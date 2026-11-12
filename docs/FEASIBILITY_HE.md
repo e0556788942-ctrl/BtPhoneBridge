@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-11
+תאריך עדכון: 2026-11-12
 
 ## מסקנה זמנית
 
@@ -131,3 +131,21 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 בקובץ התצורה של Bluetooth בענף Android 13, hfp_client_connection_service_enabled מוגדר כברירת מחדל false, וכך גם שירות החיבור ל-Emergency Calls. זה מתייחס לשילוב HFP Client עם Telecom, ואינו לבדו קובע אם פרופיל HFP Client עצמו מופעל: היצרן יכול לספק overlays ותצורה משלו. לכן יש לבדוק גם את רכיב השירות במכשיר עצמו וגם את התנהגות החיבור. מקור: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/android/app/res/values/config.xml
 
 ה-API הציבורי של Android מתעד את BluetoothHeadset כפרופיל Headset/HFP מול אוזניות, ואינו מספק API ציבורי מקביל מלא לשליטה ב-HFP Client. מקור: https://developer.android.com/develop/connectivity/bluetooth/profiles
+
+
+## עדכון 2026-11-12 — תיקון פרשנות בדיקת HFP Client
+
+בדיקת הקוד בגרסה 0.6 הסתכלה על קיום HeadsetClientService ועל service.enabled. זו אינה בדיקת מצב הפרופיל בזמן ריצה. בגרסה 0.7 היא בודקת גם את מצב ההפעלה שה-PackageManager מחזיר עבור חבילת Bluetooth והרכיב, כולל overrides מפורשים. גם תוצאה זו היא רק מצב package/component.
+
+בדיקת AOSP Android 13 הראתה שני מתגים שונים:
+- HeadsetClientService.isEnabled() מחזיר את BluetoothProperties.isProfileHfpHfEnabled().orElse(false). זהו מתג מערכת פנימי לפרופיל HFP Hands-Free Client, שאינו זמין לאפליקציה רגילה דרך API ציבורי.
+- המשאב hfp_client_connection_service_enabled מוגדר false כברירת מחדל בקובץ config.xml של AOSP Android 13. זהו מתג נפרד לשילוב שירות החיבור עם Telecom, ואינו זהה להפעלת פרופיל HFP HF.
+
+המשמעות: אם האפליקציה מוצאת HeadsetClientService ומציגה אותו כ-enabled, עדיין אין אישור שהפרופיל נטען. אם אינה מוצאת אותו, ייתכן שהיצרן שינה את חבילת Bluetooth או את המימוש. אין דרך לקבוע את מצב HFP Client המלא מ-APK רגיל בלבד.
+
+מקורות AOSP מדויקים:
+- HeadsetClientService.isEnabled() בקוד Bluetooth: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/android/app/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
+- ברירת המחדל של hfp_client_connection_service_enabled ב-Android 13: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/android/app/res/values/config.xml
+- API BluetoothHeadsetClient מסומן @SystemApi ו-@hide, ופעולות מסוימות דורשות BLUETOOTH_PRIVILEGED: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/framework/java/android/bluetooth/BluetoothHeadsetClient.java
+
+גרסה 0.7 אינה מוסיפה חיוג או גישור שמע; היא משפרת את הדיוק של אבחון המגבלה המרכזית.
