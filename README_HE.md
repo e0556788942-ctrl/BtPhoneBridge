@@ -1,8 +1,8 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 0.6):
+האפליקציה בודקת (גרסה 0.7):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
-- בדיקה פסיבית אם חבילת com.android.bluetooth מצהירה על רכיב HFP Client בשם HeadsetClientService ואם הוא מסומן פעיל במניפסט; זו אינדיקציה בלבד ולא בדיקת חיבור.
+- בדיקה פסיבית של רכיב HeadsetClientService בחבילת com.android.bluetooth, כולל מצב ההפעלה לפי PackageManager והגדרות רכיב; זו בדיקת הצהרה בלבד, לא בדיקת זמינות HFP Client בזמן ריצה.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
 - חיבורי פרופיל HFP Headset ו-A2DP שהנגן חושף.
 - גילוי שירותי SDP/UUID של מכשירים משויכים כדי לזהות אם הטלפון מפרסם HFP Audio Gateway ואם האוזניות מפרסמות HFP Hands-Free או HSP Headset. בקשת SDP מקבלת timeout של 15 שניות, ולאחריו ניתן לנסות שוב.
@@ -29,9 +29,15 @@
 7. השמע צליל בדיקה ובדוק היכן הוא נשמע; לאחר מכן הרץ בדיקת מיקרופון.
 8. לחץ העתק דוח אבחון. לפני שיתוף, בדוק שאין בו מידע אישי; האפליקציה מסתירה כתובות MAC. ציין רק את יצרן ודגם הטלפון הכשר.
 
-## בדיקת HFP Client בגרסה 0.6
+## בדיקת HFP Client בגרסאות 0.6–0.7
 
-נוספה בדיקה פסיבית של רכיב HeadsetClientService בחבילת AOSP com.android.bluetooth. האפליקציה מציגה אם הרכיב נמצא ואם הוא מסומן enabled במניפסט. אם חבילת היצרן שונה, ייתכן שהבדיקה לא תמצא אותו. גם רכיב שנמצא ומסומן פעיל אינו הוכחה שהפרופיל עלה, זמין לאפליקציה או מסוגל לנהל שיחה. לא נעשה שימוש ב-API מוסתר ולא נוספה הרשאת מערכת.
+בגרסה 0.6 נוספה בדיקה פסיבית של רכיב HeadsetClientService בחבילת AOSP com.android.bluetooth. בגרסה 0.7 היא שופרה כך שתציג גם את מצב ההפעלה של החבילה והרכיב לפי PackageManager, לרבות overrides של enabled/disabled.
+
+**הבהרה חשובה בעקבות בדיקת AOSP Android 13:** עצם קיום HeadsetClientService או מצב enabled שלו במניפסט/PackageManager אינם אומרים שהפרופיל פעיל. בקוד AOSP, HeadsetClientService.isEnabled() בודק את BluetoothProperties.isProfileHfpHfEnabled(). זהו מתג מערכת פנימי שאפליקציה רגילה אינה יכולה לאמת באמצעות API ציבורי.
+
+בנוסף, משאב AOSP בשם hfp_client_connection_service_enabled מוגדר false כברירת מחדל ב-Android 13. זהו מתג נפרד לשילוב ConnectionService עם Telecom; אין לפרש אותו כאילו הוא מכבה בהכרח את פרופיל HFP Client עצמו. יצרן יכול לשנות overlays והגדרות מערכת.
+
+לכן בדיקת 0.7 מספקת ראיה טובה יותר לגבי הצהרות PackageManager, אך אינה יכולה לקבוע אם HFP HF הופעל בפועל ב-ROM. לשם כך נדרשת בדיקת חיבור HFP Client אמיתית או בדיקת מערכת/יצרן.
 
 ## תיקון חשוב בגרסה 0.5
 
@@ -42,7 +48,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.6.
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.7.
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
