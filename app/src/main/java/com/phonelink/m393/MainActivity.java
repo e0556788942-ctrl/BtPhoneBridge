@@ -319,12 +319,12 @@ public class MainActivity extends Activity {
 
 
     /**
-     * Best-effort passive check for the AOSP Bluetooth HFP Client service component.
-     * A declared/enabled component is not proof that the profile is running or usable.
+     * Passive PackageManager inspection only. It cannot determine the runtime
+     * BluetoothProperties switch that actually enables the HFP HF profile.
      */
     private void appendHfpClientServiceProbe(PackageManager pm) {
         line("");
-        line("בדיקת רכיב HFP Client במערכת (בדיקה פסיבית):");
+        line("בדיקת HFP Client במערכת (בדיקת PackageManager בלבד):");
         final String bluetoothPackage = "com.android.bluetooth";
         try {
             PackageInfo info;
@@ -335,34 +335,70 @@ public class MainActivity extends Activity {
                 //noinspection deprecation
                 info = pm.getPackageInfo(bluetoothPackage, (int) flags);
             }
+
+            int appSetting = pm.getApplicationEnabledSetting(bluetoothPackage);
+            boolean manifestAppEnabled = info.applicationInfo != null && info.applicationInfo.enabled;
+            boolean appEnabled = isPackageManagerSettingEnabled(appSetting, manifestAppEnabled);
+            line("חבילת Bluetooth: " + enabledSettingLabel(appSetting) +
+                " · פעילה לפי PackageManager: " + appEnabled);
+
             boolean found = false;
             if (info.services != null) {
                 for (android.content.pm.ServiceInfo service : info.services) {
                     String name = service.name == null ? "" : service.name;
-                    if (HfpClientServiceDetector.matches(name)) {
-                        found = true;
-                        boolean appEnabled = info.applicationInfo != null && info.applicationInfo.enabled;
-                        boolean effectiveByManifest = service.enabled && appEnabled;
-                        line("נמצא רכיב: " + name);
-                        line("מוצהר כפעיל במניפסט: " + effectiveByManifest);
-                        line(effectiveByManifest
-                            ? "סימן חיובי בלבד: הרכיב מוצהר כפעיל; עדיין לא הוכח ששירות HFP Client עלה או שניתן להתחבר אליו."
-                            : "הרכיב קיים אך מוצהר כמושבת; נדרש שינוי קושחה/overlay של היצרן כדי להפעילו.");
-                    }
+                    if (!HfpClientServiceDetector.matches(name)) continue;
+                    found = true;
+                    ComponentName component = new ComponentName(bluetoothPackage, name);
+                    int componentSetting = pm.getComponentEnabledSetting(component);
+                    boolean componentEnabled =
+                        isPackageManagerSettingEnabled(componentSetting, service.enabled);
+                    boolean effective = appEnabled && componentEnabled;
+
+                    line("נמצא רכיב: " + name);
+                    line("מצב הרכיב: " + enabledSettingLabel(componentSetting) +
+                        " · פעיל לפי PackageManager/מניפסט: " + effective);
+                    line("זהו מצב הצהרה/הפעלה של רכיב בלבד — לא הוכחה ששירות HFP Client עלה או שהפרופיל זמין.");
                 }
             }
             if (!found) {
-                line("לא נמצא רכיב HFP Client בחבילת com.android.bluetooth.");
-                line("ייתכן שהיצרן משתמש בחבילת Bluetooth אחרת; תוצאה זו אינה הוכחה מוחלטת שאין HFP Client.");
+                line("לא נמצא HeadsetClientService בחבילת com.android.bluetooth.");
+                line("ייתכן שהיצרן משתמש בחבילה אחרת או במימוש Bluetooth שונה; אין להסיק מכך בוודאות שאין HFP Client.");
             }
         } catch (PackageManager.NameNotFoundException e) {
-            line("חבילת com.android.bluetooth אינה גלויה/מותקנת בשם זה; ייתכן שם חבילה של יצרן.");
+            line("חבילת com.android.bluetooth אינה גלויה/מותקנת בשם זה; ייתכן שם חבילה של היצרן.");
         } catch (SecurityException e) {
             line("Android חסם בדיקת רכיבי מערכת: " + e.getMessage());
         } catch (RuntimeException e) {
             line("בדיקת רכיב HFP Client לא הושלמה: " + e.getClass().getSimpleName());
         }
-        line("הבדיקה אינה קוראת API מוסתר, אינה מתחברת לפרופיל ואינה מאמתת שיחות או ניתוב שמע.");
+        line("חשוב: ב-AOSP Android 13, HeadsetClientService.isEnabled() בודק את BluetoothProperties.isProfileHfpHfEnabled().");
+        line("המתג הזה הוא מצב מערכת פנימי שאפליקציה רגילה אינה יכולה לאמת דרך API ציבורי.");
+        line("הגדרת hfp_client_connection_service_enabled היא מתג נפרד לשילוב ConnectionService עם Telecom; ב-AOSP Android 13 ברירת המחדל שלה false, והיא אינה הוכחה שהפרופיל עצמו כבוי.");
+    }
+
+    private boolean isPackageManagerSettingEnabled(int setting, boolean manifestEnabled) {
+        switch (setting) {
+            case PackageManager.COMPONENT_ENABLED_STATE_ENABLED:
+                return true;
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED:
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER:
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED:
+                return false;
+            case PackageManager.COMPONENT_ENABLED_STATE_DEFAULT:
+            default:
+                return manifestEnabled;
+        }
+    }
+
+    private String enabledSettingLabel(int setting) {
+        switch (setting) {
+            case PackageManager.COMPONENT_ENABLED_STATE_ENABLED: return "מופעל במפורש";
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED: return "מושבת במפורש";
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER: return "הושבת על ידי משתמש/מערכת";
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED: return "מושבת עד שימוש";
+            case PackageManager.COMPONENT_ENABLED_STATE_DEFAULT: return "ברירת מחדל של המניפסט";
+            default: return "מצב לא מוכר (" + setting + ")";
+        }
     }
 
     private void requestProfileProxies() {
