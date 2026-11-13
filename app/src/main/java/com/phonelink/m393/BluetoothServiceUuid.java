@@ -23,7 +23,7 @@ final class BluetoothServiceUuid {
             case "0000111e" + BASE: return "HFP Hands-Free (תפקיד דיבורית/HF)";
             case "00001112" + BASE: return "HSP Audio Gateway (AG)";
             case "00001131" + BASE: return "HSP Headset - HS (תפקיד אוזנייה)";
-            case "00001108" + BASE: return "Headset service class (HSP; נדרש אימות מול שאר ה-SDP)";
+            case "00001108" + BASE: return "Headset service class (0x1108; אינו מזהה לבדו תפקיד HS מדויק)";
             case "0000110b" + BASE: return "A2DP Audio Sink (יעד מדיה, לרוב אוזניות)";
             case "0000110a" + BASE: return "A2DP Audio Source (מקור מדיה)";
             default: return "שירות Bluetooth אחר";
@@ -33,9 +33,7 @@ final class BluetoothServiceUuid {
     static boolean isHfpAudioGateway(String raw) { return normalize(raw).equals("0000111f" + BASE); }
     static boolean isHfpHandsFree(String raw) { return normalize(raw).equals("0000111e" + BASE); }
     static boolean isHspAudioGateway(String raw) { return normalize(raw).equals("00001112" + BASE); }
-    static boolean isHspHeadset(String raw) {
-        String id = normalize(raw);
-        return id.equals("00001131" + BASE) || id.equals("00001108" + BASE);
-    }
+    static boolean isHspHeadset(String raw) { return normalize(raw).equals("00001131" + BASE); }
+    static boolean isHeadsetServiceClass(String raw) { return normalize(raw).equals("00001108" + BASE); }
     static boolean isA2dpSink(String raw) { return normalize(raw).equals("0000110b" + BASE); }
 }
