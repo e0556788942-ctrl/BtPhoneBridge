@@ -1,6 +1,6 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 0.7):
+האפליקציה בודקת (גרסה 0.8):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
 - בדיקה פסיבית של רכיב HeadsetClientService בחבילת com.android.bluetooth, כולל מצב ההפעלה לפי PackageManager והגדרות רכיב; זו בדיקת הצהרה בלבד, לא בדיקת זמינות HFP Client בזמן ריצה.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
@@ -23,7 +23,7 @@
 1. שייך את הטלפון הכשר ואת אוזניות ה-Bluetooth דרך הגדרות המערכת.
 2. פתח PhoneLink ואשר Nearby devices.
 3. לחץ על בדיקת מצב; בדוק אם האוזניות מופיעות תחת HFP Headset ולא רק תחת A2DP.
-4. המתן לתוצאות SDP/UUID. בטלפון חפש 0x111F (HFP Audio Gateway) או 0x1112 (HSP Audio Gateway); באוזניות חפש 0x111E (HFP Hands-Free), 0x1131/0x1108 (HSP Headset) ו-0x110B (A2DP Sink). היעדר UUID אינו הוכחה שאין תמיכה.
+4. המתן לתוצאות SDP/UUID. בטלפון חפש 0x111F (HFP Audio Gateway) או 0x1112 (HSP Audio Gateway); באוזניות חפש 0x111E (HFP Hands-Free), 0x1131 (HSP Headset - HS), 0x1108 (Headset service class כללי — לא מספיק לבדו לזיהוי תפקיד HS) ו-0x110B (A2DP Sink). היעדר UUID אינו הוכחה שאין תמיכה.
 5. לחץ סריקה כדי לבדוק גילוי.
 6. רענן התקני שמע לשיחה. אם מופיע Bluetooth SCO/HFP, בחר אותו ובקש מעבר.
 7. השמע צליל בדיקה ובדוק היכן הוא נשמע; לאחר מכן הרץ בדיקת מיקרופון.
@@ -48,7 +48,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.7.
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.8.
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
@@ -68,3 +68,8 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 - Linux/macOS: הרץ `./gradlew assembleDebug`.
 - Android Studio: בחר Open, פתח את תיקיית הפרויקט, המתן ל-Gradle Sync ואז Build > Build APK(s).
 ה-APK יופיע ב-`app/build/outputs/apk/debug/app-debug.apk`.
+
+
+## תיקון דיוק UUID בגרסה 0.8 (2026-11-13)
+
+הגרסה מפרידה בין UUID `0x1131` (Headset - HS, תפקיד HSP Headset) לבין `0x1108` (Headset service class כללי). קודם שניהם סווגו יחד כ-HSP Headset, דבר שהיה עלול להציג תפקיד מדויק מדי על סמך UUID כללי. כעת הדוח מציג את `0x1108` כממצא כללי בלבד, ובדיקות היחידה מוודאות שלא מסיקים ממנו לבדו תפקיד HS. השינוי אינו מוסיף חיבור HFP Client או גישור שמע.
