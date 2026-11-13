@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-12
+תאריך עדכון: 2026-11-13
 
 ## מסקנה זמנית
 
@@ -28,7 +28,7 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 
 ## מה נבדק בקוד
 
-האבטיפוס הנוכחי (גרסה 0.6):
+האבטיפוס הנוכחי (גרסה 0.8):
 - מציג גרסת Android ודגם.
 - מציג תכונות מערכת: Bluetooth Classic, Bluetooth LE, Telephony ומיקרופון.
 - מציג התקנים משויכים ומאפשר סריקת Bluetooth.
@@ -149,3 +149,15 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 - API BluetoothHeadsetClient מסומן @SystemApi ו-@hide, ופעולות מסוימות דורשות BLUETOOTH_PRIVILEGED: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/framework/java/android/bluetooth/BluetoothHeadsetClient.java
 
 גרסה 0.7 אינה מוסיפה חיוג או גישור שמע; היא משפרת את הדיוק של אבחון המגבלה המרכזית.
+
+
+## עדכון 2026-11-13 — דיוק בהבחנה בין UUID 0x1108 ל-0x1131 (גרסה 0.8)
+
+בדיקה חוזרת מול רשימת Assigned Numbers של Bluetooth SIG הראתה שיש להבחין בין `0x1131` בשם Headset - HS, לבין `0x1108` בשם Headset (Service Class/Profile). גרסה 0.7 סיווגה את שניהם באותה פונקציה כ-HSP Headset. הדבר היה עלול להציג את `0x1108` כאילו הוא מזהה חד-משמעית את תפקיד HS. בגרסה 0.8:
+- `0x1131` בלבד מסווג כ-HSP Headset - HS.
+- `0x1108` מוצג בנפרד כ-Headset service class כללי, ואינו משמש לבדו להסקת תפקיד HS.
+- נוספו בדיקות יחידה שמוודאות את ההפרדה.
+
+המקור הוא Bluetooth SIG Assigned Numbers, סעיף Headset Profile (HSP), המונה את Headset `0x1108`, Headset Audio Gateway `0x1112`, ו-Headset - HS `0x1131`: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Assigned_Numbers/out/en/Assigned_Numbers.pdf
+
+זהו תיקון דיוק בדוח SDP בלבד. הוא אינו מוכיח חיבור, אינו מוסיף HFP Client ואינו משנה את מגבלות Android 13. נדרשת עדיין בדיקה פיזית של M393, הטלפון והאוזניות.
