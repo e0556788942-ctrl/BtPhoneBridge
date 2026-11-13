@@ -695,7 +695,7 @@ public class MainActivity extends Activity {
             append("גילוי SDP הסתיים ללא UUID. גם זו אינה הוכחה מוחלטת שאין תמיכה.");
             return;
         }
-        boolean hfpAg = false, hfpHf = false, hspAg = false, hspHs = false, a2dpSink = false;
+        boolean hfpAg = false, hfpHf = false, hspAg = false, hspHs = false, headsetClass = false, a2dpSink = false;
         for (ParcelUuid parcelUuid : uuids) {
             String id = parcelUuid.toString().toLowerCase(Locale.US);
             String label = BluetoothServiceUuid.label(id);
@@ -703,11 +703,14 @@ public class MainActivity extends Activity {
             hfpHf |= BluetoothServiceUuid.isHfpHandsFree(id);
             hspAg |= BluetoothServiceUuid.isHspAudioGateway(id);
             hspHs |= BluetoothServiceUuid.isHspHeadset(id);
+            headsetClass |= BluetoothServiceUuid.isHeadsetServiceClass(id);
             a2dpSink |= BluetoothServiceUuid.isA2dpSink(id);
             append("• " + id + " — " + label);
         }
         if (hfpAg || hspAg) append("ממצא: ההתקן מפרסם תפקיד Audio Gateway; זה סימן חיובי לטלפון שמולו הנגן אמור להיות Hands-Free.");
-        if (hfpHf || hspHs) append("ממצא: ההתקן מפרסם תפקיד Hands-Free/Headset; זה סימן חיובי לאוזניות.");
+        if (hfpHf) append("ממצא: ההתקן מפרסם HFP Hands-Free (0x111E); זה סימן חיובי לאוזניות HFP.");
+        if (hspHs) append("ממצא: ההתקן מפרסם HSP Headset - HS (0x1131).");
+        if (headsetClass) append("ממצא: ההתקן מפרסם Headset service class (0x1108); UUID זה לבדו אינו מזהה בוודאות את תפקיד HSP HS.");
         if (a2dpSink) append("ממצא: ההתקן מפרסם A2DP Sink, תפקיד נפוץ באוזניות מדיה.");
         append("הערה: UUID מסייע לזהות תפקידים שההתקן מפרסם, אך אינו מוכיח שחיבור, שמע דו-כיווני או עבודה בו-זמנית יתאפשרו.");
     }
