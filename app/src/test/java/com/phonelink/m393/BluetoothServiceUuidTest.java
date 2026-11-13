@@ -13,7 +13,9 @@ public class BluetoothServiceUuidTest {
     @Test public void identifiesHspRoles() {
         assertTrue(BluetoothServiceUuid.isHspAudioGateway("0x1112"));
         assertTrue(BluetoothServiceUuid.isHspHeadset("1131"));
-        assertTrue(BluetoothServiceUuid.isHspHeadset("1108"));
+        assertFalse(BluetoothServiceUuid.isHspHeadset("1108"));
+        assertTrue(BluetoothServiceUuid.isHeadsetServiceClass("1108"));
+        assertFalse(BluetoothServiceUuid.isHeadsetServiceClass("1131"));
         assertFalse(BluetoothServiceUuid.isHspAudioGateway("1131"));
     }
 
