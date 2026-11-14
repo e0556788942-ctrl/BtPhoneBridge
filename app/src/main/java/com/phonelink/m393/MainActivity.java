@@ -61,6 +61,12 @@ public class MainActivity extends Activity {
                 append("סריקת Bluetooth התחילה…");
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 append("סריקת Bluetooth הסתיימה.");
+            } else if (BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                handleProfileConnectionEvent(intent, "HFP Headset");
+            } else if (BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED.equals(action)) {
+                handleHfpAudioEvent(intent);
+            } else if (BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                handleProfileConnectionEvent(intent, "A2DP");
             } else if (BluetoothDevice.ACTION_UUID.equals(action)) {
                 BluetoothDevice device;
                 ParcelUuid[] uuids;
@@ -177,6 +183,9 @@ public class MainActivity extends Activity {
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_UUID);
+        filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
+        filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         // Bluetooth broadcasts are sent by the privileged Bluetooth app UID,
         // not necessarily by Android's system UID. NOT_EXPORTED can block them.
         // Export only behind the signature/privileged sender permission.
@@ -188,6 +197,37 @@ public class MainActivity extends Activity {
                 Manifest.permission.BLUETOOTH_PRIVILEGED, null);
         }
         receiverRegistered = true;
+    }
+
+    private BluetoothDevice deviceFromProfileIntent(Intent intent) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            return intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
+        }
+        //noinspection deprecation
+        return intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+    }
+
+    private void handleProfileConnectionEvent(Intent intent, String profileName) {
+        BluetoothDevice device = deviceFromProfileIntent(intent);
+        int current = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_DISCONNECTED);
+        int previous = intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, -1);
+        append(profileName + " — מצב חיבור: " + BluetoothProfileState.connection(current) +
+            " · מצב קודם: " + (previous < 0 ? "לא נמסר" : BluetoothProfileState.connection(previous)) +
+            " · התקן: " + (device == null ? "לא זוהה" : safeName(device)));
+        showReport();
+    }
+
+    private void handleHfpAudioEvent(Intent intent) {
+        BluetoothDevice device = deviceFromProfileIntent(intent);
+        int current = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
+        int previous = intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, -1);
+        append("HFP SCO — מצב שמע: " + BluetoothProfileState.hfpAudio(current) +
+            " · מצב קודם: " + (previous < 0 ? "לא נמסר" : BluetoothProfileState.hfpAudio(previous)) +
+            " · התקן: " + (device == null ? "לא זוהה" : safeName(device)));
+        if (current == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
+            append("נפתח ערוץ SCO מול התקן ה-HFP הזה. הדבר אינו מוכיח גישור שיחה מהטלפון אל האוזניות.");
+        }
+        showReport();
     }
 
     private void requestBluetoothPermissions() {
@@ -304,6 +344,7 @@ public class MainActivity extends Activity {
 
         line("");
         line("פרופילי Bluetooth של הנגן:");
+        line("מעקב אירועים פעיל: חיבור HFP, מצב שמע HFP/SCO וחיבור A2DP. השאר את המסך פתוח בזמן בדיקת חיבור/ניתוק.");
         line("HFP Headset = הנגן כ-AG מול אוזניות HF; A2DP = שמע מדיה.");
         line("הם אינם מוכיחים שהנגן תומך ב-HFP Client מול הטלפון.");
         line("HFP Client הוא תפקיד נפרד שנדרש כדי שהנגן יופיע לטלפון כדיבורית.");
