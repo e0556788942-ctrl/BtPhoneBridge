@@ -8,8 +8,8 @@ android {
         applicationId 'com.phonelink.m393'
         minSdk 26
         targetSdk 33
-        versionCode 8
-        versionName '0.8-diagnostic'
+        versionCode 9
+        versionName '0.9-diagnostic'
     }
 }
 
