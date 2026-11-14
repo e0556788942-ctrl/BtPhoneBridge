@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-13
+תאריך עדכון: 2026-11-14
 
 ## מסקנה זמנית
 
@@ -28,7 +28,7 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 
 ## מה נבדק בקוד
 
-האבטיפוס הנוכחי (גרסה 0.8):
+האבטיפוס הנוכחי (גרסה 0.9):
 - מציג גרסת Android ודגם.
 - מציג תכונות מערכת: Bluetooth Classic, Bluetooth LE, Telephony ומיקרופון.
 - מציג התקנים משויכים ומאפשר סריקת Bluetooth.
@@ -161,3 +161,18 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 המקור הוא Bluetooth SIG Assigned Numbers, סעיף Headset Profile (HSP), המונה את Headset `0x1108`, Headset Audio Gateway `0x1112`, ו-Headset - HS `0x1131`: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Assigned_Numbers/out/en/Assigned_Numbers.pdf
 
 זהו תיקון דיוק בדוח SDP בלבד. הוא אינו מוכיח חיבור, אינו מוסיף HFP Client ואינו משנה את מגבלות Android 13. נדרשת עדיין בדיקה פיזית של M393, הטלפון והאוזניות.
+
+## שיפור אבחון בגרסה 0.9 (2026-11-14) — מעקב אירועי HFP/SCO
+
+נוספו למקלט האירועים של האפליקציה:
+- `BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED`: מתעד מעבר בין CONNECTING/CONNECTED/DISCONNECTING/DISCONNECTED של קישור HFP מול התקן Headset.
+- `BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED`: מתעד את מצב ערוץ HFP SCO: CONNECTING, CONNECTED או DISCONNECTED.
+- `BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED`: מתעד חיבור A2DP בנפרד, כדי שלא לבלבל חיבור מדיה עם חיבור דיבורית.
+
+האירועים נרשמים בדוח עם שם ההתקן בלבד, ללא כתובת MAC. יש להשאיר את האפליקציה פתוחה בזמן הבדיקה; המקלט הוא דינמי ואינו משחזר אירועים שהתרחשו לפני פתיחתה. אירוע SCO_CONNECTED הוא ראיה לכך שערוץ HFP audio נפתח מול התקן ה-Headset המקומי. הוא אינו מוכיח שהשיחה מהטלפון נכנסת לנגן, שהנגן מפעיל HFP Client מול הטלפון, או שקיים גישור בין שני קישורי HFP.
+
+נוספו בדיקות יחידה למיפוי מצבי חיבור ומצבי SCO. הן בודקות את תוויות המצבים בלבד, ולא מדמות Bluetooth או חומרה.
+
+מקור API רשמי:
+- BluetoothHeadset ACTION_CONNECTION_STATE_CHANGED / ACTION_AUDIO_STATE_CHANGED / STATE_AUDIO_CONNECTED: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
+- BluetoothA2dp ACTION_CONNECTION_STATE_CHANGED: https://developer.android.com/reference/android/bluetooth/BluetoothA2dp
