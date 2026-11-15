@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-14
+תאריך עדכון: 2026-11-15
 
 ## מסקנה זמנית
 
@@ -176,3 +176,17 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 מקור API רשמי:
 - BluetoothHeadset ACTION_CONNECTION_STATE_CHANGED / ACTION_AUDIO_STATE_CHANGED / STATE_AUDIO_CONNECTED: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
 - BluetoothA2dp ACTION_CONNECTION_STATE_CHANGED: https://developer.android.com/reference/android/bluetooth/BluetoothA2dp
+
+
+## שיפור אבחון בגרסה 1.0 (2026-11-15) — נתיב AudioTrack/AudioRecord בפועל
+
+הבדיקה הקודמת הציגה התקני שמע זמינים ואת התקן התקשורת שנבחר ב-AudioManager, אך אלה אינם בהכרח ההתקן שאליו זרם מסוים מנותב בפועל. גרסה 1.0 מוסיפה:
+- דגימה של AudioTrack.getRoutedDevice() לאחר תחילת השמעת צליל הבדיקה.
+- דגימה של AudioRecord.getRoutedDevice() בזמן הקלטת המיקרופון.
+- הצגת שם התקן, סוגו וכיוון source/sink; אם לא התקבל התקן בזמן הדגימה, הדוח מציין זאת במפורש.
+
+לפי Android API, getRoutedDevice() תקף בזמן ש-AudioTrack מנגן או AudioRecord מקליט, ומחזיר null כאשר אין זרם פעיל או כאשר אין התקן מנותב מדווח. לכן הקוד דוגם בזמן פעילות הזרם ולא משתמש ב-getPreferredDevice() כהוכחה לניתוב בפועל.
+
+**גבול ההוכחה:** התוצאה מוכיחה רק את הנתיב של זרם הבדיקה ששייך לאפליקציה. היא אינה מוכיחה את הנתיב של שיחת מערכת, את פעולת HFP Client מול הטלפון, או גישור דו-כיווני בין HFP Client ל-HFP Audio Gateway. נדרשת עדיין בדיקה פיזית ב-M393.
+
+מקור API: https://developer.android.com/reference/android/media/AudioRouting#getRoutedDevice()

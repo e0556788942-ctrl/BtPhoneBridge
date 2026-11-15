@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
         addButton(root, "העתק דוח אבחון", v -> copyReport());
 
         TextView note = new TextView(this);
-        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. בדיקת נתיב השמע בודקת את נתיב התקשורת של האפליקציה בלבד; היא אינה מגשרת שיחת HFP מהטלפון אל האוזניות.");
+        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.0 מדווחת גם על התקן השמע בפועל של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
         note.setTextColor(0xFFFFD58A);
         note.setTextSize(14);
         note.setPadding(0, 18, 0, 18);
@@ -604,10 +604,25 @@ public class MainActivity extends Activity {
             track.write(data, 0, data.length);
             track.setVolume(0.18f);
             track.play();
+            if (testTrack != null) {
+                try { testTrack.stop(); } catch (Exception ignored) {}
+                try { testTrack.release(); } catch (Exception ignored) {}
+            }
+            testTrack = track;
             append("הושמע צליל בדיקה קצר. בדוק באיזה התקן שמעת אותו.");
-            new android.os.Handler(getMainLooper()).postDelayed(() -> {
-                try { track.stop(); } catch (Exception ignored) {}
-                track.release();
+            mainHandler.postDelayed(() -> {
+                if (testTrack == track) {
+                    AudioDeviceInfo routed = track.getRoutedDevice();
+                    append("נתיב יציאת AudioTrack בפועל בזמן השמעה: " + describeRoutedDevice(routed, "יציאה"));
+                    showReport();
+                }
+            }, 250);
+            mainHandler.postDelayed(() -> {
+                if (testTrack == track) {
+                    testTrack = null;
+                    try { track.stop(); } catch (Exception ignored) {}
+                    track.release();
+                }
             }, 1200);
         } catch (Exception e) {
             append("לא ניתן להשמיע צליל בדיקה: " + e.getMessage());
@@ -642,8 +657,21 @@ public class MainActivity extends Activity {
                 long count = 0;
                 recorder.startRecording();
                 long end = System.currentTimeMillis() + 3000;
+                long routeDeadline = System.currentTimeMillis() + 750;
+                boolean routeReported = false;
                 while (System.currentTimeMillis() < end && micRunning) {
                     int n = recorder.read(buffer, 0, buffer.length);
+                    if (!routeReported) {
+                        AudioDeviceInfo routedInput = recorder.getRoutedDevice();
+                        if (routedInput != null || System.currentTimeMillis() >= routeDeadline) {
+                            final String routeDescription = describeRoutedDevice(routedInput, "כניסה");
+                            runOnUiThread(() -> {
+                                append("נתיב כניסת AudioRecord בפועל בזמן הקלטה: " + routeDescription);
+                                showReport();
+                            });
+                            routeReported = true;
+                        }
+                    }
                     if (n > 0) {
                         for (int i = 0; i < n; i++) {
                             long x = buffer[i];
@@ -677,6 +705,15 @@ public class MainActivity extends Activity {
             line("• " + d.getProductName() + " · " + audioType(d.getType()) +
                 " · מקור: " + d.isSource() + " · יעד: " + d.isSink());
         }
+    }
+
+    private String describeRoutedDevice(AudioDeviceInfo device, String direction) {
+        if (device == null) return AudioRouteDescription.unavailable(direction);
+        return AudioRouteDescription.describe(
+            String.valueOf(device.getProductName()),
+            audioType(device.getType()),
+            device.isSource(),
+            device.isSink());
     }
 
     private String audioType(int type) {
@@ -776,6 +813,12 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         micRunning = false;
+        if (testTrack != null) {
+            AudioTrack activeTrack = testTrack;
+            testTrack = null;
+            try { activeTrack.stop(); } catch (Exception ignored) {}
+            try { activeTrack.release(); } catch (Exception ignored) {}
+        }
         for (Runnable timeout : uuidTimeouts.values()) mainHandler.removeCallbacks(timeout);
         uuidTimeouts.clear();
         uuidRequests.clear();
