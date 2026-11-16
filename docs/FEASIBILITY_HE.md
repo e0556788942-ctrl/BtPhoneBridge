@@ -1,6 +1,6 @@
 # PhoneLink — בדיקת היתכנות טכנית ממוקדת
 
-תאריך עדכון: 2026-11-15
+תאריך עדכון: 2026-11-16
 
 ## מסקנה זמנית
 
@@ -28,7 +28,7 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 
 ## מה נבדק בקוד
 
-האבטיפוס הנוכחי (גרסה 0.9):
+האבטיפוס הנוכחי (גרסה 1.1):
 - מציג גרסת Android ודגם.
 - מציג תכונות מערכת: Bluetooth Classic, Bluetooth LE, Telephony ומיקרופון.
 - מציג התקנים משויכים ומאפשר סריקת Bluetooth.
@@ -52,11 +52,11 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 ### שיפורי אבחון בגרסה 0.4 (2026-11-09)
 
 - בקשות SDP מקבלות כעת timeout מפורש של 15 שניות. אם לא מתקבל אירוע `ACTION_UUID`, הדוח מציג שהבדיקה לא קיבלה תשובה, מסיר את מצב ה-pending ומאפשר ניסיון נוסף. timeout אינו מפורש כהיעדר תמיכה.
-- אירועי Bluetooth נרשמים ב-Android 13 עם `RECEIVER_NOT_EXPORTED`, כדי שה-receiver לא יקבל שידורים מאפליקציות אחרות; הוא עדיין מיועד לקבל אירועי מערכת.
+- בגרסה 0.4 המקלט נרשם זמנית עם `RECEIVER_NOT_EXPORTED`; הדבר תוקן בגרסה 0.5, כמפורט בסעיף תיקון האבטחה בהמשך. אין להתייחס להגדרת 0.4 כהתנהגות הגרסה הנוכחית.
 - מיפוי UUID הופרד למחלקה טהורה `BluetoothServiceUuid`, ונוספו בדיקות יחידה ל-HFP AG/HF, ל-HSP AG/HS ולהבחנה בין A2DP Sink ל-A2DP Source.
 - GitHub Actions מריץ כעת `testDebugUnitTest` לפני יצירת ה-APK. בדיקות היחידה מאמתות את מיפוי ה-UUID בלבד; הן אינן בדיקת Bluetooth או שמע על חומרה.
 
-השיפורים האלה מתקנים מצב שבו בקשת SDP שלא קיבלה תשובה הייתה נשארת מסומנת כממתינה ללא הגבלת זמן, ומשפרים את בטיחות קליטת אירועי המערכת. הם אינם מוסיפים HFP Client ואינם משנים את מגבלות Android.
+השיפורים האלה מתקנים מצב שבו בקשת SDP שלא קיבלה תשובה הייתה נשארת מסומנת כממתינה ללא הגבלת זמן. תיקון קליטת אירועי Bluetooth נעשה לאחר מכן בגרסה 0.5. הם אינם מוסיפים HFP Client ואינם משנים את מגבלות Android.
 
 ## שיפור שבוצע בגרסה 0.6 (2026-11-11)
 
@@ -112,7 +112,6 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 - Bluetooth SIG Assigned Numbers: https://www.bluetooth.com/specifications/assigned-numbers/
 - Android Bluetooth permissions: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions
 - BluetoothDevice.fetchUuidsWithSdp / ACTION_UUID: https://developer.android.com/reference/android/bluetooth/BluetoothDevice
-- BluetoothHeadset public API: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
 - AOSP BluetoothHeadsetClient source: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/framework/java/android/bluetooth/BluetoothHeadsetClient.java
 - AudioManager communication routing: https://developer.android.com/reference/android/media/AudioManager
 
@@ -190,3 +189,31 @@ UUID הוא רמז לשירות שההתקן מפרסם ב-SDP. הוא אינו 
 **גבול ההוכחה:** התוצאה מוכיחה רק את הנתיב של זרם הבדיקה ששייך לאפליקציה. היא אינה מוכיחה את הנתיב של שיחת מערכת, את פעולת HFP Client מול הטלפון, או גישור דו-כיווני בין HFP Client ל-HFP Audio Gateway. נדרשת עדיין בדיקה פיזית ב-M393.
 
 מקור API: https://developer.android.com/reference/android/media/AudioRouting#getRoutedDevice()
+
+
+## עדכון 2026-11-16 — גרסה 1.1: מעקב נתיב שמע והבהרת תפקידי HFP
+
+גרסה 1.1 מוסיפה `AudioRouting.OnRoutingChangedListener` גם לזרם `AudioTrack` וגם לזרם `AudioRecord`. בזמן השמעת צליל הבדיקה או הקלטת המיקרופון, שינויי נתיב נרשמים לדוח; נשמרת גם דגימת `getRoutedDevice()` בזמן פעילות הזרם. כך ניתן לראות אם Android ניתב את זרם האפליקציה מחדש במהלך הבדיקה. הדבר אינו מספק גישה לזרם השיחה של מערכת הטלפון.
+
+הדוח וקוד האירועים הובהרו: `BluetoothHeadset` ו-`BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED` מתייחסים לשירות Headset המקומי שבו הנגן הוא Audio Gateway מול אוזניות Hands-Free. אין להסיק מהם שהנגן התחבר לטלפון כ-HFP Client. כדי להוכיח את תפקיד HFP Client נדרשת תוצאת חיבור מהצד הזה, שאינה זמינה דרך API ציבורי רגיל של האפליקציה.
+
+לפני בחירת התקן תקשורת, האפליקציה שומרת את מצב `AudioManager` הקודם. בעת ניקוי הנתיב או סגירת הפעילות היא מנסה לשחזר אותו, אך רק אם המצב הנוכחי עדיין `MODE_IN_COMMUNICATION`; אם מצב Android השתנה, היא לא דורסת אותו. זה מצמצם הפרעה אפשרית ליישום תקשורת אחר, אך עדיין מומלץ לא לבצע בדיקת ניתוב בזמן שיחה חשובה פעילה.
+
+### ממצא AOSP נוסף: הפעלת שני תפקידי HFP
+
+ב-AOSP קיימים מתגי תצורה נפרדים לתפקיד HFP Audio Gateway ולתפקיד HFP Hands-Free Client. לפי `BluetoothProperties.sysprop`, ערכי התפקידים נקבעים על ידי vendor overlay ונקראים בעת אתחול Bluetooth. לכן נוכחות Android 13 או Bluetooth Classic לבדם אינן מבטיחות שתפקיד HF Client מופעל ב-M393. קיום שני מתגים נפרדים גם אינו מוכיח ששני קישורי HFP או שני ערוצי SCO יכולים לפעול במקביל באותו ROM.
+
+בתיעוד `BluetoothHeadset` מצוין שה-API המקומי תומך בחיבור אוזניית Bluetooth אחת בכל פעם. זה מתאים לתרחיש של זוג אוזניות אחד מול הנגן, אך אינו אומר דבר על חיבור HFP Client נפרד לטלפון. יש לאמת את שני התפקידים ואת ה-coexistence בפועל.
+
+Android 12 ומעלה כולל יכולות Combined Audio Routing, אולם תיעוד AOSP מתאר בחירת כמה התקנים לאסטרטגיית שמע באמצעות system APIs עבור אפליקציות privileged, עם דיווח יכולות מצד Audio HAL של היצרן. זו אינה הרשאה ציבורית לאפליקציה רגילה, והיא אינה כשלעצמה גשר בין שיחת HFP Client לבין HFP AG.
+
+מקורות ממוקדים:
+- Bluetooth properties של AOSP: https://android.googlesource.com/platform/system/libsysprop/+/refs/heads/android13-release/srcs/android/sysprop/BluetoothProperties.sysprop
+- `BluetoothHeadset` API והגבלת חיבור אוזנייה אחת: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
+- Combined audio device routing ב-AOSP: https://source.android.com/docs/core/audio/combined-audio-routing
+- `AudioRouting` ו-`getRoutedDevice()`: https://developer.android.com/reference/android/media/AudioRouting
+- `AudioManager.setCommunicationDevice()`: https://developer.android.com/reference/android/media/AudioManager#setCommunicationDevice(android.media.AudioDeviceInfo)
+
+## סטטוס גרסה
+
+גרסה 1.1 היא אבטיפוס אבחוני (`versionCode 11`, `versionName 1.1-diagnostic`). היא עדיין אינה מממשת חיוג/מענה, HFP Client, או גישור שמע. בדיקות היחידה מאמתות לוגיקה טהורה ותוויות בלבד; רק בדיקת חומרה עם דוח מה-M393 תוכל לקבוע אם פרופילי Bluetooth והניתוב פועלים במכשיר.
