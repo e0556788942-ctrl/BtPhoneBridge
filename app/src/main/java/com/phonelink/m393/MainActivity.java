@@ -16,6 +16,7 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.widget.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends Activity {
     private static final int REQ_BT = 42;
@@ -37,7 +38,10 @@ public class MainActivity extends Activity {
     private boolean profilesRequested;
     private boolean micTestRequested;
     private AudioTrack testTrack;
+    private AudioRouting.OnRoutingChangedListener testTrackRouteListener;
     private AudioRecord audioRecord;
+    private int previousAudioMode = -1;
+    private boolean communicationModeChanged;
     private volatile boolean micRunning;
     private AudioDeviceCallback audioDeviceCallback;
     private AudioManager.OnCommunicationDeviceChangedListener communicationListener;
@@ -62,7 +66,7 @@ public class MainActivity extends Activity {
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 append("סריקת Bluetooth הסתיימה.");
             } else if (BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
-                handleProfileConnectionEvent(intent, "HFP Headset");
+                handleProfileConnectionEvent(intent, "HFP Headset/AG מול האוזניות");
             } else if (BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED.equals(action)) {
                 handleHfpAudioEvent(intent);
             } else if (BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
@@ -157,7 +161,7 @@ public class MainActivity extends Activity {
         addButton(root, "העתק דוח אבחון", v -> copyReport());
 
         TextView note = new TextView(this);
-        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.0 מדווחת גם על התקן השמע בפועל של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
+        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.1 עוקבת גם אחר שינויי נתיב של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
         note.setTextColor(0xFFFFD58A);
         note.setTextSize(14);
         note.setPadding(0, 18, 0, 18);
@@ -221,11 +225,11 @@ public class MainActivity extends Activity {
         BluetoothDevice device = deviceFromProfileIntent(intent);
         int current = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
         int previous = intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, -1);
-        append("HFP SCO — מצב שמע: " + BluetoothProfileState.hfpAudio(current) +
+        append("HFP Headset/AG SCO — מצב שמע: " + BluetoothProfileState.hfpAudio(current) +
             " · מצב קודם: " + (previous < 0 ? "לא נמסר" : BluetoothProfileState.hfpAudio(previous)) +
             " · התקן: " + (device == null ? "לא זוהה" : safeName(device)));
         if (current == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
-            append("נפתח ערוץ SCO מול התקן ה-HFP הזה. הדבר אינו מוכיח גישור שיחה מהטלפון אל האוזניות.");
+            append("נפתח ערוץ SCO בצד HFP Headset/AG המקומי (הנגן מול האוזניות). הדבר אינו בודק את ערוץ HFP Client מול הטלפון ואינו מוכיח גישור שיחה.");
         }
         showReport();
     }
@@ -344,8 +348,9 @@ public class MainActivity extends Activity {
 
         line("");
         line("פרופילי Bluetooth של הנגן:");
-        line("מעקב אירועים פעיל: חיבור HFP, מצב שמע HFP/SCO וחיבור A2DP. השאר את המסך פתוח בזמן בדיקת חיבור/ניתוק.");
-        line("HFP Headset = הנגן כ-AG מול אוזניות HF; A2DP = שמע מדיה.");
+        line("מעקב אירועים פעיל: חיבור HFP Headset/AG של הנגן מול אוזניות, מצב SCO בצד זה וחיבור A2DP. השאר את המסך פתוח בזמן בדיקת חיבור/ניתוק.");
+        line("BluetoothHeadset/Headset proxy מתאר את הנגן כ-Audio Gateway מול אוזניות HF; A2DP = שמע מדיה.");
+        line("אירועי ACTION_CONNECTION_STATE_CHANGED ו-ACTION_AUDIO_STATE_CHANGED כאן שייכים לצד Headset/AG המקומי, ולא מוכיחים מצב HFP Client מול הטלפון.");
         line("הם אינם מוכיחים שהנגן תומך ב-HFP Client מול הטלפון.");
         line("HFP Client הוא תפקיד נפרד שנדרש כדי שהנגן יופיע לטלפון כדיבורית.");
         line("אין API ציבורי לאפליקציה רגילה שמאמת את מצב HFP Client המקומי של ה-ROM; UUID של הטלפון לבדו אינו מספיק.");
@@ -444,7 +449,7 @@ public class MainActivity extends Activity {
 
     private void requestProfileProxies() {
         if (adapter == null || !hasBtPermission()) return;
-        if (headsetProxy != null) appendProfile("HFP Headset (הנגן מול אוזניות)", headsetProxy);
+        if (headsetProxy != null) appendProfile("HFP Headset/AG (הנגן מול אוזניות)", headsetProxy);
         if (a2dpProxy != null) appendProfile("A2DP (מדיה)", a2dpProxy);
         if (profilesRequested) return;
         profilesRequested = true;
@@ -554,6 +559,10 @@ public class MainActivity extends Activity {
         }
         AudioDeviceInfo device = communicationDevices.get(index);
         try {
+            if (!communicationModeChanged) {
+                previousAudioMode = audioManager.getMode();
+                communicationModeChanged = true;
+            }
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
             boolean accepted = audioManager.setCommunicationDevice(device);
             append("בקשת ניתוב ל-" + device.getProductName() + ": " + (accepted ? "התקבלה; יש לאמת בפועל." : "נדחתה."));
@@ -573,7 +582,7 @@ public class MainActivity extends Activity {
     private void clearCommunicationDevice() {
         if (Build.VERSION.SDK_INT >= 31 && audioManager != null) {
             audioManager.clearCommunicationDevice();
-            audioManager.setMode(AudioManager.MODE_NORMAL);
+            restorePreviousAudioMode();
             append("ניקיתי את בחירת נתיב התקשורת של האפליקציה.");
         }
         showReport();
@@ -603,23 +612,33 @@ public class MainActivity extends Activity {
                 .build();
             track.write(data, 0, data.length);
             track.setVolume(0.18f);
-            track.play();
             if (testTrack != null) {
+                if (testTrackRouteListener != null) {
+                    try { testTrack.removeOnRoutingChangedListener(testTrackRouteListener); } catch (Exception ignored) {}
+                }
                 try { testTrack.stop(); } catch (Exception ignored) {}
                 try { testTrack.release(); } catch (Exception ignored) {}
             }
+            AtomicReference<String> lastRoute = new AtomicReference<>();
+            testTrackRouteListener = router -> appendRouteIfChanged(
+                "שינוי נתיב יציאת AudioTrack", router.getRoutedDevice(), "יציאה", lastRoute);
+            track.addOnRoutingChangedListener(testTrackRouteListener, mainHandler);
             testTrack = track;
-            append("הושמע צליל בדיקה קצר. בדוק באיזה התקן שמעת אותו.");
+            track.play();
+            append("הושמע צליל בדיקה קצר. מעקב שינויי נתיב פעיל בזמן ההשמעה.");
             mainHandler.postDelayed(() -> {
                 if (testTrack == track) {
-                    AudioDeviceInfo routed = track.getRoutedDevice();
-                    append("נתיב יציאת AudioTrack בפועל בזמן השמעה: " + describeRoutedDevice(routed, "יציאה"));
-                    showReport();
+                    appendRouteIfChanged("נתיב יציאת AudioTrack בפועל בזמן השמעה",
+                        track.getRoutedDevice(), "יציאה", lastRoute);
                 }
             }, 250);
             mainHandler.postDelayed(() -> {
                 if (testTrack == track) {
                     testTrack = null;
+                    if (testTrackRouteListener != null) {
+                        try { track.removeOnRoutingChangedListener(testTrackRouteListener); } catch (Exception ignored) {}
+                        testTrackRouteListener = null;
+                    }
                     try { track.stop(); } catch (Exception ignored) {}
                     track.release();
                 }
@@ -647,11 +666,19 @@ public class MainActivity extends Activity {
                 return;
             }
             AudioRecord recorder = null;
+            AudioRouting.OnRoutingChangedListener routeListener = null;
             try {
                 recorder = new AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, rate,
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(min, 4096));
                 if (recorder.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException("AudioRecord לא אותחל");
                 audioRecord = recorder;
+                AtomicReference<String> lastRoute = new AtomicReference<>();
+                routeListener = router -> {
+                    AudioDeviceInfo routed = router.getRoutedDevice();
+                    runOnUiThread(() -> appendRouteIfChanged(
+                        "שינוי נתיב כניסת AudioRecord", routed, "כניסה", lastRoute));
+                };
+                recorder.addOnRoutingChangedListener(routeListener, new Handler(getMainLooper()));
                 short[] buffer = new short[1024];
                 long sumSquares = 0;
                 long count = 0;
@@ -664,11 +691,9 @@ public class MainActivity extends Activity {
                     if (!routeReported) {
                         AudioDeviceInfo routedInput = recorder.getRoutedDevice();
                         if (routedInput != null || System.currentTimeMillis() >= routeDeadline) {
-                            final String routeDescription = describeRoutedDevice(routedInput, "כניסה");
-                            runOnUiThread(() -> {
-                                append("נתיב כניסת AudioRecord בפועל בזמן הקלטה: " + routeDescription);
-                                showReport();
-                            });
+                            runOnUiThread(() -> appendRouteIfChanged(
+                                "נתיב כניסת AudioRecord בפועל בזמן הקלטה",
+                                routedInput, "כניסה", lastRoute));
                             routeReported = true;
                         }
                     }
@@ -691,12 +716,42 @@ public class MainActivity extends Activity {
             } finally {
                 micRunning = false;
                 if (recorder != null) {
+                    if (routeListener != null) {
+                        try { recorder.removeOnRoutingChangedListener(routeListener); } catch (Exception ignored) {}
+                    }
                     try { recorder.stop(); } catch (Exception ignored) {}
                     recorder.release();
                 }
                 audioRecord = null;
             }
         }, "PhoneLink-Mic-Test").start();
+    }
+
+    private void appendRouteIfChanged(String label, AudioDeviceInfo device, String direction,
+                                      AtomicReference<String> lastRoute) {
+        String description = describeRoutedDevice(device, direction);
+        String previous = lastRoute.getAndSet(description);
+        if (!description.equals(previous)) {
+            append(label + ": " + description);
+            showReport();
+        }
+    }
+
+    private void restorePreviousAudioMode() {
+        if (!communicationModeChanged || audioManager == null) return;
+        try {
+            if (audioManager.getMode() == AudioManager.MODE_IN_COMMUNICATION && previousAudioMode >= 0) {
+                audioManager.setMode(previousAudioMode);
+                append("מצב השמע הקודם שוחזר: " + previousAudioMode + ".");
+            } else {
+                append("מצב השמע לא שוחזר אוטומטית כי מצב Android השתנה מאז בקשת הניתוב.");
+            }
+        } catch (Exception e) {
+            append("לא ניתן לשחזר את מצב השמע הקודם: " + e.getMessage());
+        } finally {
+            communicationModeChanged = false;
+            previousAudioMode = -1;
+        }
     }
 
     private void appendAudio(AudioDeviceInfo[] devices, String direction) {
@@ -816,6 +871,10 @@ public class MainActivity extends Activity {
         if (testTrack != null) {
             AudioTrack activeTrack = testTrack;
             testTrack = null;
+            if (testTrackRouteListener != null) {
+                try { activeTrack.removeOnRoutingChangedListener(testTrackRouteListener); } catch (Exception ignored) {}
+                testTrackRouteListener = null;
+            }
             try { activeTrack.stop(); } catch (Exception ignored) {}
             try { activeTrack.release(); } catch (Exception ignored) {}
         }
@@ -833,7 +892,8 @@ public class MainActivity extends Activity {
             if (communicationListener != null) {
                 try { audioManager.removeOnCommunicationDeviceChangedListener(communicationListener); } catch (Exception ignored) {}
             }
-            try { audioManager.clearCommunicationDevice(); audioManager.setMode(AudioManager.MODE_NORMAL); } catch (Exception ignored) {}
+            try { audioManager.clearCommunicationDevice(); } catch (Exception ignored) {}
+            restorePreviousAudioMode();
         }
         try {
             if (adapter != null && headsetProxy != null) adapter.closeProfileProxy(BluetoothProfile.HEADSET, headsetProxy);

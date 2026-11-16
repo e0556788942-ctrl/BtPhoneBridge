@@ -1,6 +1,6 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 1.0):
+האפליקציה בודקת (גרסה 1.1):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
 - בדיקה פסיבית של רכיב HeadsetClientService בחבילת com.android.bluetooth, כולל מצב ההפעלה לפי PackageManager והגדרות רכיב; זו בדיקת הצהרה בלבד, לא בדיקת זמינות HFP Client בזמן ריצה.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
@@ -48,7 +48,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 0.9.
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 1.1 (versionCode 11).
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
@@ -77,11 +77,11 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 ## מעקב חי אחר HFP/SCO בגרסה 0.9
 
 גרסה 0.9 מוסיפה קליטת אירועי מערכת ציבוריים:
-- `BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED` — מצב חיבור HFP מול האוזניות.
-- `BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED` — מצב ערוץ השמע HFP/SCO (מתחבר/מחובר/מנותק).
+- `BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED` — מצב חיבור HFP Headset/Audio Gateway המקומי של הנגן מול האוזניות.
+- `BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED` — מצב ערוץ השמע HFP/SCO בצד Headset/Audio Gateway המקומי של הנגן.
 - `BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED` — מצב חיבור A2DP, כדי להבדיל בין חיבור מדיה לחיבור דיבורית.
 
-השאר את PhoneLink פתוחה בזמן שיוך/חיבור/ניתוק. האירועים נרשמים בדוח בלי כתובות MAC. אירוע `SCO מחובר` מוכיח רק שנפתח ערוץ שמע HFP מול אותו התקן; הוא אינו מוכיח ששיחת הטלפון מועברת מהטלפון לאוזניות או ששני קישורי HFP פעילים יחד.
+השאר את PhoneLink פתוחה בזמן שיוך/חיבור/ניתוק. האירועים נרשמים בדוח בלי כתובות MAC. אירוע `SCO מחובר` כאן מתייחס לצד Headset/Audio Gateway המקומי מול האוזניות בלבד; הוא אינו מדווח על SCO של HFP Client מול הטלפון ואינו מוכיח ששיחת הטלפון מועברת לאוזניות.
 
 מקור: Android BluetoothHeadset API — https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
 
@@ -96,3 +96,12 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 הבדיקה נשענת על AudioRouting.getRoutedDevice() (API 24 ומעלה), ויש לקרוא לה רק בזמן שה-AudioTrack מנגן או AudioRecord מקליט. היא מספקת ראיה לנתיב של זרמי האודיו של PhoneLink בלבד; היא אינה מוכיחה ששיחת מערכת או שיחת HFP חיצונית מנותבת באותו אופן, ואינה יוצרת גישור בין שני קישורי Bluetooth.
 
 בדיקות היחידה החדשות בודקות רק את עיצוב תיאור הנתיב. הן אינן מדמות Audio HAL, Bluetooth, מיקרופון או חומרה.
+
+
+## שיפור גרסה 1.1 (2026-11-16) — מעקב רציף אחר שינויי נתיב שמע
+
+- נוספו `AudioRouting.OnRoutingChangedListener` ל-`AudioTrack` ול-`AudioRecord`. הדוח מתעד שינויי נתיב שמתרחשים בזמן שזרם בדיקת הצליל או המיקרופון פעיל, בנוסף לדגימת `getRoutedDevice()` שכבר קיימת.
+- אירועי `BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED` ו-`ACTION_AUDIO_STATE_CHANGED` מסומנים במפורש כאירועים של צד HFP Headset/Audio Gateway המקומי של הנגן מול האוזניות. הם אינם בדיקה של HFP Client מול הטלפון.
+- לפני בקשת נתיב תקשורת האפליקציה שומרת את מצב `AudioManager` הקודם ומנסה לשחזרו לאחר ניקוי הנתיב או סגירת המסך. אם Android כבר שינה את מצב השמע, האפליקציה נמנעת מדריסה אוטומטית של המצב החדש.
+
+המעקב הרציף משפר את תיעוד שינויי הניתוב, אך עדיין בודק רק זרמי אודיו שנוצרו על ידי PhoneLink. הוא אינו מאזין לשיחת מערכת, אינו פותח HFP Client מול הטלפון ואינו מגשר בין שני קישורי SCO.
