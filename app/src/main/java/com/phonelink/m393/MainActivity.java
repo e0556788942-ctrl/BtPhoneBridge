@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
         addButton(root, "העתק דוח אבחון", v -> copyReport());
 
         TextView note = new TextView(this);
-        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.0 מדווחת גם על התקן השמע בפועל של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
+        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.1 עוקבת גם אחר שינויי נתיב של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
         note.setTextColor(0xFFFFD58A);
         note.setTextSize(14);
         note.setPadding(0, 18, 0, 18);
