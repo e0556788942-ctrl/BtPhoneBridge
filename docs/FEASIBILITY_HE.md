@@ -217,3 +217,50 @@ Android 12 ומעלה כולל יכולות Combined Audio Routing, אולם ת�
 ## סטטוס גרסה
 
 גרסה 1.1 היא אבטיפוס אבחוני (`versionCode 11`, `versionName 1.1-diagnostic`). היא עדיין אינה מממשת חיוג/מענה, HFP Client, או גישור שמע. בדיקות היחידה מאמתות לוגיקה טהורה ותוויות בלבד; רק בדיקת חומרה עם דוח מה-M393 תוכל לקבוע אם פרופילי Bluetooth והניתוב פועלים במכשיר.
+
+
+## עדכון 2026-11-17 — איסוף דוח מערכת חיצוני ב-ADB
+
+נוסף כלי קריאה בלבד: `tools/collect_m393_bt_diagnostics.ps1`.
+
+הכלי אוסף מהמכשיר המחובר:
+- דגם וגרסת Android/API.
+- שורות נבחרות מ-`dumpsys package com.android.bluetooth`, כולל אזכורים של `HeadsetClientService` ומצב רכיבים כאשר Android חושף אותם.
+- שורות נבחרות מ-`dumpsys bluetooth_manager` ומ-`dumpsys audio`.
+- שירותי מערכת ששמם כולל Bluetooth או audio.
+
+הכלי אינו משנה הגדרות, אינו מתקין APK, אינו מבקש root ואינו מקליט שמע. כתובות MAC מוסתרות אוטומטית בדוח; שמות התקנים ופרטי build עשויים עדיין להופיע, ולכן יש לעיין בדוח לפני שיתוף. נדרשים מחשב עם Android Platform Tools, חיבור USB ואישור USB debugging על הנגן.
+
+הפעלה מתוך תיקיית המאגר ב-PowerShell:
+```powershell
+.\\tools\\collect_m393_bt_diagnostics.ps1
+```
+
+אם מחוברים כמה מכשירים, ניתן לציין את מזהה ה-ADB:
+```powershell
+.\\tools\\collect_m393_bt_diagnostics.ps1 -Serial "DEVICE_SERIAL"
+```
+
+הדוח נוצר כקובץ TXT בתיקייה הנוכחית. הכלי הוא איסוף ראיות מערכת בלבד: גם אם `HeadsetClientService` מופיע ב-dumpsys, הדבר אינו מוכיח שהמתג הפנימי של HFP HF פעיל, שהפרופיל התחיל, או שניתן להחזיק שני קישורי HFP במקביל.
+
+### דיוק נוסף מקריאת תצורת AOSP Android 13
+
+בקובץ `android/app/res/values/config.xml` בענף Android 13 נמצאו ערכי ברירת מחדל:
+- `headset_client_initial_audio_route_allowed=true`.
+- `hfp_client_connection_service_enabled=false`.
+- `config_bluetooth_max_connected_audio_devices=5`.
+
+יש לפרש אותם בזהירות:
+- ערך route מותר בתחילת HFP Client הוא הגדרת מדיניות, לא הוכחה שהפרופיל HFP HF מופעל ב-ROM של M393.
+- `hfp_client_connection_service_enabled` שולט בשילוב ConnectionService עם Telecom; הוא נפרד מהפעלת פרופיל HFP Client.
+- תקרת חמישה התקני שמע היא מגבלת תצורה כללית של ה-stack, ואינה מוכיחה ששני תפקידי HFP או שני ערוצי SCO יכולים לפעול בו-זמנית.
+
+היצרן יכול לשנות ערכי resource באמצעות overlay. לכן דוח ADB מהמכשיר עצמו ובדיקת חיבור בפועל עדיין נחוצים.
+
+מקורות:
+- תצורת Bluetooth ב-AOSP Android 13: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/android13-release/android/app/res/values/config.xml
+- תיעוד BluetoothHeadset (כולל הערת Android על חיבור אוזנייה אחת בפרופיל המקומי): https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
+- תיעוד registerReceiver והמשמעות של broadcastPermission: https://developer.android.com/reference/android/content/Context#registerReceiver(android.content.BroadcastReceiver,android.content.IntentFilter,java.lang.String,android.os.Handler)
+- תיעוד ניתוב התקן תקשורת: https://developer.android.com/reference/android/media/AudioManager#setCommunicationDevice(android.media.AudioDeviceInfo)
+
+**סטטוס:** השינוי בריצה זו הוא כלי איסוף ADB ומסמך בדיקה. לא שונה קוד האפליקציה, ולכן לא נבנה APK חדש בריצה זו. לא בוצעה בדיקת חומרה כי אין חיבור ADB פעיל לנגן מתוך סביבת העבודה.
