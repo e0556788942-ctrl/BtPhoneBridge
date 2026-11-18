@@ -8,6 +8,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate PowerShell ADB collector syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            "tools/collect_m393_bt_diagnostics.ps1",
+            [ref]$tokens,
+            [ref]$parseErrors
+          )
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List | Out-String | Write-Host
+            exit 1
+          }
+          Write-Host "PowerShell syntax OK"
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
