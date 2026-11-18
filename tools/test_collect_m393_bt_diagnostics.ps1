@@ -1,10 +1,10 @@
 $ErrorActionPreference = "Stop"
-$script:adbCalls = New-Object System.Collections.Generic.List[string]
+$global:PhoneLinkAdbCalls = New-Object System.Collections.Generic.List[string]
 
 function adb {
     $adbArgs = @($args)
     $global:LASTEXITCODE = 0
-    $script:adbCalls.Add(($adbArgs -join " "))
+    $global:PhoneLinkAdbCalls.Add(($adbArgs -join " "))
 
     if ($adbArgs.Count -gt 0 -and $adbArgs[0] -eq "-s") {
         $adbArgs = @($adbArgs | Select-Object -Skip 2)
@@ -104,7 +104,7 @@ try {
     if ($report.Contains("AA:BB:CC:DD:EE:FF")) { throw "A Bluetooth MAC address was not redacted." }
     if ($report.Contains("TEST-DEVICE")) { throw "The ADB serial leaked into the report." }
 
-    $unexpected = @($script:adbCalls | Where-Object {
+    $unexpected = @($global:PhoneLinkAdbCalls | Where-Object {
         $_ -match "(?i)\b(install|uninstall|setprop|settings\s+put|am\s+(start|broadcast)|pm\s+(enable|disable|grant|revoke))\b"
     })
     if ($unexpected.Count -gt 0) {
@@ -117,4 +117,5 @@ finally {
     if (Test-Path -LiteralPath $outputPath) {
         Remove-Item -LiteralPath $outputPath -Force
     }
+    Remove-Variable -Name PhoneLinkAdbCalls -Scope Global -ErrorAction SilentlyContinue
 }
