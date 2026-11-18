@@ -233,12 +233,12 @@ Android 12 ומעלה כולל יכולות Combined Audio Routing, אולם ת�
 
 הפעלה מתוך תיקיית המאגר ב-PowerShell:
 ```powershell
-.\\tools\\collect_m393_bt_diagnostics.ps1
+.\tools\collect_m393_bt_diagnostics.ps1
 ```
 
 אם מחוברים כמה מכשירים, ניתן לציין את מזהה ה-ADB:
 ```powershell
-.\\tools\\collect_m393_bt_diagnostics.ps1 -Serial "DEVICE_SERIAL"
+.\tools\collect_m393_bt_diagnostics.ps1 -Serial "DEVICE_SERIAL"
 ```
 
 הדוח נוצר כקובץ TXT בתיקייה הנוכחית. הכלי הוא איסוף ראיות מערכת בלבד: גם אם `HeadsetClientService` מופיע ב-dumpsys, הדבר אינו מוכיח שהמתג הפנימי של HFP HF פעיל, שהפרופיל התחיל, או שניתן להחזיק שני קישורי HFP במקביל.
