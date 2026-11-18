@@ -55,7 +55,8 @@ GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בש�
 UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסייע להבחין בין Audio Gateway לבין Hands-Free/Headset, אך אינו מוכיח שהנגן מסוגל להפעיל את פרופיל HFP Client, או ששני קישורי Bluetooth יפעלו במקביל. היעדר UUID עשוי לנבוע ממטמון, SDP שלא הושלם או מגבלות קושחה.
 
 ## מקורות טכניים
-- מסמך בדיקת היתכנות ומטריצת בדיקות חומרה: [docs/FEASIBILITY_HE.md](docs/FEASIBILITY_HE.md)\n- Bluetooth SIG Assigned Numbers (HFP/HSP/A2DP UUIDs): https://www.bluetooth.com/specifications/assigned-numbers/
+- מסמך בדיקת היתכנות ומטריצת בדיקות חומרה: [docs/FEASIBILITY_HE.md](docs/FEASIBILITY_HE.md)
+- Bluetooth SIG Assigned Numbers (HFP/HSP/A2DP UUIDs): https://www.bluetooth.com/specifications/assigned-numbers/
 - Android Bluetooth permissions: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions
 - BluetoothHeadset public API: https://developer.android.com/reference/android/bluetooth/BluetoothHeadset
 - BluetoothHeadsetClient AOSP System API: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/framework/java/android/bluetooth/BluetoothHeadsetClient.java
