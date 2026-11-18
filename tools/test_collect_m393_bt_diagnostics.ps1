@@ -49,7 +49,7 @@ function adb {
             "dumpsys bluetooth_manager" {
                 Write-Output "state: ON"
                 Write-Output "Profile: HEADSET_CLIENT"
-                Write-Output "device=AA:BB:CC:DD:EE:FF"
+                Write-Output "Bluetooth device=AA:BB:CC:DD:EE:FF"
                 return
             }
             "dumpsys activity services" {
