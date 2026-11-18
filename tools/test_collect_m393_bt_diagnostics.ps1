@@ -93,7 +93,7 @@ try {
         "M393",
         "com.vendor.bluetooth",
         "HeadsetClientService",
-        "dumpsys activity services",
+        "Running activity services related to Bluetooth/audio",
         "Audio policy",
         "XX:XX:XX:XX:XX:XX",
         "ADB serial is not written"
