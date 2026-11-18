@@ -8,21 +8,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate PowerShell ADB collector syntax
+      - name: Validate PowerShell diagnostic scripts
         shell: pwsh
         run: |
-          $tokens = $null
-          $parseErrors = $null
-          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+          foreach ($file in @(
             "tools/collect_m393_bt_diagnostics.ps1",
-            [ref]$tokens,
-            [ref]$parseErrors
-          )
-          if ($parseErrors.Count -gt 0) {
-            $parseErrors | Format-List | Out-String | Write-Host
-            exit 1
+            "tools/test_collect_m393_bt_diagnostics.ps1"
+          )) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              $file,
+              [ref]$tokens,
+              [ref]$parseErrors
+            )
+            if ($parseErrors.Count -gt 0) {
+              Write-Host "Syntax errors in $file"
+              $parseErrors | Format-List | Out-String | Write-Host
+              exit 1
+            }
           }
           Write-Host "PowerShell syntax OK"
+      - name: Test ADB collector with mocked device
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test_collect_m393_bt_diagnostics.ps1
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -50,7 +59,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
       - name: Package source project
         run: |
-          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md docs/FEASIBILITY_HE.md .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
+          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md docs/FEASIBILITY_HE.md tools .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
       - uses: actions/upload-artifact@v4
         with:
           name: phonelink-m393-diagnostic-apk
