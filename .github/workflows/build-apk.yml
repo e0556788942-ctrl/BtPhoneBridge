@@ -13,7 +13,9 @@ jobs:
         run: |
           foreach ($file in @(
             "tools/collect_m393_bt_diagnostics.ps1",
-            "tools/test_collect_m393_bt_diagnostics.ps1"
+            "tools/test_collect_m393_bt_diagnostics.ps1",
+            "tools/analyze_m393_bt_report.ps1",
+            "tools/test_analyze_m393_bt_report.ps1"
           )) {
             $tokens = $null
             $parseErrors = $null
@@ -32,6 +34,9 @@ jobs:
       - name: Test ADB collector with mocked device
         shell: pwsh
         run: pwsh -NoProfile -File tools/test_collect_m393_bt_diagnostics.ps1
+      - name: Test offline report analyzer
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test_analyze_m393_bt_report.ps1
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -59,7 +64,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
       - name: Package source project
         run: |
-          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md docs/FEASIBILITY_HE.md tools .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
+          zip -r PhoneLink_M393_Source.zip app build.gradle settings.gradle README_HE.md docs/FEASIBILITY_HE.md docs/ADB_REPORT_ANALYZER_HE.md tools .github/workflows/build-apk.yml gradlew gradlew.bat gradle/wrapper -x 'app/build/*'
       - uses: actions/upload-artifact@v4
         with:
           name: phonelink-m393-diagnostic-apk
