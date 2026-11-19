@@ -118,3 +118,22 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 ```
 
 הכלי דורש Android Platform Tools ו-USB debugging שאושר על הנגן. הוא לקריאה בלבד, לא מתקין דבר ולא משנה הגדרות. לפני שיתוף דוח יש לבדוק שמות התקנים ופרטי build.
+
+
+## סיכום דוח ADB אופליין (חדש)
+
+אפשר לנתח דוח ADB שנאסף מהנגן בלי לחבר את המחשב שוב: 
+
+```powershell
+.\tools\analyze_m393_bt_report.ps1 -ReportPath .\PhoneLink_M393_ADB_YYYYMMDD_HHMMSS.txt
+```
+
+כדי לשמור סיכום:
+
+```powershell
+.\tools\analyze_m393_bt_report.ps1 -ReportPath .\PhoneLink_M393_ADB_....txt -OutputPath .\PhoneLink_M393_Summary.txt
+```
+
+הכלי קורא קובץ בלבד ואינו מפעיל ADB או משנה את הנגן. הוא מסכם מצב Bluetooth, חבילות Bluetooth מועמדות, אזכור HeadsetClientService, אזכור HEADSET_CLIENT, וממצאי מדיניות SCO לכניסה/יציאה. **כל אלה הם רמזי מערכת בלבד ואינם מוכיחים HFP Client פעיל, שני קישורי HFP במקביל או גישור שיחה.**
+
+הוראות מלאות: [docs/ADB_REPORT_ANALYZER_HE.md](docs/ADB_REPORT_ANALYZER_HE.md). בדיקות אופליין: `tools/test_analyze_m393_bt_report.ps1`.
