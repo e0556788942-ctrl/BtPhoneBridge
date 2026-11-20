@@ -23,7 +23,7 @@ try {
         "",
         "=== Bluetooth manager ===",
         "state: ON",
-        "Profile: HEADSET_CLIENT",
+        "Profile: HEADSET_CLIENT enabled=true",
         "",
         "=== Audio policy ===",
         "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
@@ -34,7 +34,7 @@ try {
     Assert-Contains $positive "com.vendor.bluetooth"
     Assert-Contains $positive "HeadsetClientService: נמצא"
     Assert-Contains $positive "enabled=true"
-    Assert-Contains $positive "נמצא (טקסט דוח בלבד)"
+    Assert-Contains $positive "HFP Client indication: נמצא ערך true/enabled"
     Assert-Contains $positive "מדיניות SCO יציאה: נמצא"
     Assert-Contains $positive "מדיניות SCO כניסה: נמצא"
     Assert-Contains $positive "אינו מוכיח"
@@ -51,6 +51,7 @@ try {
         "",
         "=== Bluetooth manager ===",
         "state: OFF",
+        "Profile: HEADSET_CLIENT enabled=false",
         "",
         "=== Audio policy ===",
         "No SCO devices in this filtered report"
@@ -61,6 +62,31 @@ try {
     Assert-Contains $negative "לא נמצא בדוח המסונן"
     Assert-Contains $negative "אין מספיק ראיות"
 
+    # A profile name without an explicit enabled value must not be treated as positive evidence.
+    $unknownPath = Join-Path $tempRoot "unknown.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.android.bluetooth",
+        "",
+        "=== Package details: com.android.bluetooth ===",
+        "Package [com.android.bluetooth]",
+        "HeadsetClientService enabled=true",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "Profile: HEADSET_CLIENT",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $unknownPath -Encoding UTF8
+    $unknown = (& $scriptPath -ReportPath $unknownPath) -join [Environment]::NewLine
+    Assert-Contains $unknown "נמצא אזכור HFP Client ללא ערך enabled מפורש"
+    Assert-Contains $unknown "אין מספיק ראיות"
+    if ($unknown -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "A profile mention without an enabled value was incorrectly scored as positive evidence."
+    }
     Write-Host "Analyzer tests passed: positive and negative evidence, conservative interpretation, and output-file generation."
 }
 finally {
