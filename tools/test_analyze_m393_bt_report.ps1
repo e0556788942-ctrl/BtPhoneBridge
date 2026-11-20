@@ -87,7 +87,33 @@ try {
     if ($unknown -match "קיימים רמזים מערכתיים חיוביים") {
         throw "A profile mention without an enabled value was incorrectly scored as positive evidence."
     }
-    Write-Host "Analyzer tests passed: positive and negative evidence, conservative interpretation, and output-file generation."
+    # Contradictory flags must be reported as mixed evidence, not a positive result.
+    $mixedPath = Join-Path $tempRoot "mixed.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.android.bluetooth",
+        "",
+        "=== Package details: com.android.bluetooth ===",
+        "Package [com.android.bluetooth]",
+        "HeadsetClientService enabled=true",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "Profile: HEADSET_CLIENT enabled=true",
+        "profile_supported_hfpclient=false",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $mixedPath -Encoding UTF8
+    $mixed = (& $scriptPath -ReportPath $mixedPath) -join [Environment]::NewLine
+    Assert-Contains $mixed "נמצאו ערכים סותרים של enabled/disabled"
+    Assert-Contains $mixed "אין מספיק ראיות"
+    if ($mixed -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "Contradictory HFP client flags were incorrectly scored as positive evidence."
+    }
+    Write-Host "Analyzer tests passed: positive, negative, unknown, and conflicting HFP client evidence."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
