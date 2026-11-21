@@ -54,11 +54,15 @@ if ($managerText -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופ�
 }
 
 $serviceLines = @($packageDetailLines | Where-Object { $_ -match '(?i)HeadsetClientService' })
+$serviceEnabledEvidence = @($serviceLines | Where-Object { $_ -match '(?i)\benabled\s*[:=]\s*true\b' })
+$serviceDisabledEvidence = @($serviceLines | Where-Object { $_ -match '(?i)\benabled\s*[:=]\s*false\b|\bdisabled\b' })
+$serviceEnabledHint = $serviceEnabledEvidence.Count -gt 0 -and $serviceDisabledEvidence.Count -eq 0
 $serviceFinding = "לא נמצא בקטעי package dump שנאספו (היעדר אינו הוכחה שאין תמיכה)"
 if ($serviceLines.Count -gt 0) {
-    $enabledText = "מצב enabled לא צוין בשורה"
-    if ($serviceLines -match '(?i)\benabled\s*[:=]\s*true\b') { $enabledText = "בשורה מופיע enabled=true (רכיב בלבד)" }
-    elseif ($serviceLines -match '(?i)\benabled\s*[:=]\s*false\b') { $enabledText = "בשורה מופיע enabled=false (רכיב בלבד)" }
+    if ($serviceEnabledEvidence.Count -gt 0 -and $serviceDisabledEvidence.Count -gt 0) { $enabledText = "נמצאו שורות רכיב סותרות (רמז בלבד)" }
+    elseif ($serviceEnabledEvidence.Count -gt 0) { $enabledText = "בשורה מופיע enabled=true (רכיב בלבד)" }
+    elseif ($serviceDisabledEvidence.Count -gt 0) { $enabledText = "בשורה מופיע enabled=false/disabled (רכיב בלבד)" }
+    else { $enabledText = "מצב enabled לא צוין בשורה" }
     $serviceFinding = "נמצא אזכור שירות · $enabledText · אינו מוכיח תפקיד HFP Client פעיל"
 }
 
@@ -92,7 +96,7 @@ $summary.Add("HeadsetClientService: $serviceFinding")
 $summary.Add("HFP Client indication: $clientProfileFinding")
 $summary.Add("מדיניות SCO יציאה: " + $(if ($scoOut) { "נמצא בקטע Audio policy" } else { "לא נמצא בדוח המסונן (לא מכריע)" }))
 $summary.Add("מדיניות SCO כניסה: " + $(if ($scoIn) { "נמצא בקטע Audio policy" } else { "לא נמצא בדוח המסונן (לא מכריע)" }))
-if ($bluetoothState -eq "ON" -and $serviceLines.Count -gt 0 -and $clientProfilePositive -and $scoOut -and $scoIn) {
+if ($bluetoothState -eq "ON" -and $serviceEnabledHint -and $clientProfilePositive -and $scoOut -and $scoIn) {
     $summary.Add("הערכת סיכום: קיימים רמזים מערכתיים חיוביים; נדרשת בדיקת חיבור HFP Client ושמע פיזית.")
 } else {
     $summary.Add("הערכת סיכום: אין מספיק ראיות בדוח המסונן; נדרשת בדיקת מכשיר/יצרן.")
