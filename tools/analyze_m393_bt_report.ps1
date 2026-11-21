@@ -66,10 +66,10 @@ if ($serviceLines.Count -gt 0) {
 # Package/component mentions (e.g. HeadsetClientService enabled=true) are not profile evidence.
 $clientProfileToken = '(?i)\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled'
 $clientProfileLines = @($managerLines | Where-Object { $_ -match $clientProfileToken })
-$clientEnabledPattern = '(?i)(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled).*(?:[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b)|(?:[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b).*(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled)'
-$clientDisabledPattern = '(?i)(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled).*(?:[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b)|(?:[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b).*(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled)'
-$clientEnabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientEnabledPattern })
-$clientDisabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientDisabledPattern })
+$clientEnabledFlag = '(?i)[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b(?!\s*[:=]\s*(?:false|0)\b)'
+$clientDisabledFlag = '(?i)[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b'
+$clientEnabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientEnabledFlag })
+$clientDisabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientDisabledFlag })
 $clientProfilePositive = $clientEnabledEvidence.Count -gt 0 -and $clientDisabledEvidence.Count -eq 0
 $clientProfileFinding = "לא נמצא אזכור HFP Client במקטע Bluetooth manager (לא מכריע)"
 if ($clientEnabledEvidence.Count -gt 0 -and $clientDisabledEvidence.Count -gt 0) {
