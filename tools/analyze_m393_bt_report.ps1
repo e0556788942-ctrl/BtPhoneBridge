@@ -46,7 +46,7 @@ $packages = @($candidateLines | ForEach-Object { $_.Trim() } |
     Where-Object { $_ -match '^[A-Za-z0-9_.]+$' } | Sort-Object -Unique)
 
 $bluetoothState = "לא ידוע"
-$managerText = $managerLines -join "`n"
+$managerText = $managerLines -join "\n"
 if ($managerText -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופעל)\s*[:=]\s*(?:true|1|on)\b') {
     $bluetoothState = "ON"
 } elseif ($managerText -match '(?i)\bstate\s*:\s*OFF\b|\bBluetooth\s+(?:disabled|כבוי)\s*[:=]\s*(?:false|0|off)\b') {
@@ -57,29 +57,29 @@ $serviceLines = @($packageDetailLines | Where-Object { $_ -match '(?i)HeadsetCli
 $serviceFinding = "לא נמצא בקטעי package dump שנאספו (היעדר אינו הוכחה שאין תמיכה)"
 if ($serviceLines.Count -gt 0) {
     $enabledText = "מצב enabled לא צוין בשורה"
-    if ($serviceLines -match '(?i)\benabled\s*[:=]\s*true\b') { $enabledText = "בשורה מופיע enabled=true (הצהרה בלבד)" }
-    elseif ($serviceLines -match '(?i)\benabled\s*[:=]\s*false\b') { $enabledText = "בשורה מופיע enabled=false (הצהרה בלבד)" }
-    $serviceFinding = "נמצא אזכור שירות · $enabledText"
+    if ($serviceLines -match '(?i)\benabled\s*[:=]\s*true\b') { $enabledText = "בשורה מופיע enabled=true (רכיב בלבד)" }
+    elseif ($serviceLines -match '(?i)\benabled\s*[:=]\s*false\b') { $enabledText = "בשורה מופיע enabled=false (רכיב בלבד)" }
+    $serviceFinding = "נמצא אזכור שירות · $enabledText · אינו מוכיח תפקיד HFP Client פעיל"
 }
 
-# Profile-name presence is not positive evidence: the dump may explicitly say false.
-$clientProfileLines = @($managerLines | Where-Object {
-    $_ -match '(?i)\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|HFP\s+(?:HF|CLIENT)|profile_supported_hfpclient|hfp_client_enabled'
-})
-$clientEnabledPattern = '(?i)(?:hfp[_-]?client|headset[_-]?client|headsetclient).*(?:[:=]\s*(?:true|1)|\b(?:enabled|supported)\b)|(?:[:=]\s*(?:true|1)|\b(?:enabled|supported)\b).*(?:hfp[_-]?client|headset[_-]?client|headsetclient)'
-$clientDisabledPattern = '(?i)(?:hfp[_-]?client|headset[_-]?client|headsetclient).*(?:[:=]\s*(?:false|0)|\b(?:disabled|unsupported|not\s+supported)\b)|(?:[:=]\s*(?:false|0)|\b(?:disabled|unsupported|not\s+supported)\b).*(?:hfp[_-]?client|headset[_-]?client|headsetclient)'
+# Only the Bluetooth-manager section may provide profile evidence.
+# Package/component mentions (e.g. HeadsetClientService enabled=true) are not profile evidence.
+$clientProfileToken = '(?i)\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled'
+$clientProfileLines = @($managerLines | Where-Object { $_ -match $clientProfileToken })
+$clientEnabledPattern = '(?i)(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled).*(?:[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b)|(?:[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b).*(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled)'
+$clientDisabledPattern = '(?i)(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled).*(?:[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b)|(?:[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b).*(?:\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled)'
 $clientEnabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientEnabledPattern })
 $clientDisabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientDisabledPattern })
 $clientProfilePositive = $clientEnabledEvidence.Count -gt 0 -and $clientDisabledEvidence.Count -eq 0
-$clientProfileFinding = "לא נמצא אזכור HFP Client ב-Bluetooth manager (לא מכריע)"
+$clientProfileFinding = "לא נמצא אזכור HFP Client במקטע Bluetooth manager (לא מכריע)"
 if ($clientEnabledEvidence.Count -gt 0 -and $clientDisabledEvidence.Count -gt 0) {
     $clientProfileFinding = "נמצאו ערכים סותרים של enabled/disabled (טקסט דוח בלבד; לא מכריע)"
 } elseif ($clientEnabledEvidence.Count -gt 0) {
-    $clientProfileFinding = "נמצא ערך true/enabled (רמז חיובי בלבד; טקסט דוח)"
+    $clientProfileFinding = "נמצא ערך true/enabled במקטע Bluetooth manager (רמז חיובי בלבד; טקסט דוח)"
 } elseif ($clientDisabledEvidence.Count -gt 0) {
-    $clientProfileFinding = "נמצא ערך false/disabled (רמז שלילי בלבד; טקסט דוח)"
+    $clientProfileFinding = "נמצא ערך false/disabled במקטע Bluetooth manager (רמז שלילי בלבד; טקסט דוח)"
 } elseif ($clientProfileLines.Count -gt 0) {
-    $clientProfileFinding = "נמצא אזכור HFP Client ללא ערך enabled מפורש (לא ראיה להפעלה)"
+    $clientProfileFinding = "נמצא אזכור HFP Client ללא ערך enabled מפורש במקטע Bluetooth manager (לא ראיה להפעלה)"
 }
 $scoOut = @($audioPolicyLines | Where-Object { $_ -match '(?i)AUDIO_DEVICE_OUT_BLUETOOTH_SCO|TYPE_BLUETOOTH_SCO|SCO.*(?:output|sink)|Bluetooth.*SCO.*(?:output|sink)' }).Count -gt 0
 $scoIn = @($audioPolicyLines | Where-Object { $_ -match '(?i)AUDIO_DEVICE_IN_BLUETOOTH_SCO|SCO.*(?:input|source)|Bluetooth.*SCO.*(?:input|source)' }).Count -gt 0
