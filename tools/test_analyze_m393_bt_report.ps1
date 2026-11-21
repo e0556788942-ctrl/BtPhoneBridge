@@ -60,7 +60,9 @@ try {
     Assert-Contains $negative "Bluetooth: OFF"
     Assert-Contains $negative "HeadsetClientService: לא נמצא"
     Assert-Contains $negative "לא נמצא בדוח המסונן"
+    Assert-Contains $negative "HFP Client indication: נמצא ערך false/disabled במקטע Bluetooth manager"
     Assert-Contains $negative "אין מספיק ראיות"
+    if ($negative -match "נמצאו ערכים סותרים") { throw "A disabled-only profile line was incorrectly classified as conflicting evidence." }
 
     # A component/service mention must not become HFP profile evidence.
     $serviceOnlyPath = Join-Path $tempRoot "service-only.txt"
