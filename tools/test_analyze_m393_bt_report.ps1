@@ -64,6 +64,34 @@ try {
     Assert-Contains $negative "אין מספיק ראיות"
     if ($negative -match "נמצאו ערכים סותרים") { throw "A disabled-only profile line was incorrectly classified as conflicting evidence." }
 
+    # A disabled service component must suppress the aggregate positive hint.
+    $serviceDisabledPath = Join-Path $tempRoot "service-disabled.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.vendor.bluetooth",
+        "",
+        "=== Package details: com.vendor.bluetooth ===",
+        "Package [com.vendor.bluetooth]",
+        "HeadsetClientService enabled=false",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "Profile: HEADSET_CLIENT enabled=true",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $serviceDisabledPath -Encoding UTF8
+    $serviceDisabled = (& $scriptPath -ReportPath $serviceDisabledPath) -join "`n"
+    Assert-Contains $serviceDisabled "HeadsetClientService: נמצא אזכור שירות"
+    Assert-Contains $serviceDisabled "enabled=false/disabled"
+    Assert-Contains $serviceDisabled "HFP Client indication: נמצא ערך true/enabled במקטע Bluetooth manager"
+    Assert-Contains $serviceDisabled "אין מספיק ראיות"
+    if ($serviceDisabled -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "An explicitly disabled HeadsetClientService was incorrectly summarized as positive."
+    }
+
     # A component/service mention must not become HFP profile evidence.
     $serviceOnlyPath = Join-Path $tempRoot "service-only.txt"
     @(
@@ -143,7 +171,7 @@ try {
         throw "Contradictory HFP client flags were incorrectly scored as positive evidence."
     }
 
-    Write-Host "Analyzer tests passed: positive, negative, service-only, unknown, and conflicting HFP Client evidence."
+    Write-Host "Analyzer tests passed: positive, negative, disabled-service, service-only, unknown, and conflicting HFP Client evidence."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
