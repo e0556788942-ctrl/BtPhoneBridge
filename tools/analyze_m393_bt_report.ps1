@@ -45,11 +45,15 @@ foreach ($line in $lines) {
 $packages = @($candidateLines | ForEach-Object { $_.Trim() } |
     Where-Object { $_ -match '^[A-Za-z0-9_.]+$' } | Sort-Object -Unique)
 
-$bluetoothState = "לא ידוע"
 $managerText = $managerLines -join "\n"
-if ($managerText -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופעל)\s*[:=]\s*(?:true|1|on)\b') {
+$stateOnEvidence = @($managerLines | Where-Object { $_ -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופעל)\s*[:=]\s*(?:true|1|on)\b' })
+$stateOffEvidence = @($managerLines | Where-Object { $_ -match '(?i)\bstate\s*:\s*OFF\b|\bBluetooth\s+(?:disabled|כבוי)\s*[:=]\s*(?:false|0|off)\b' })
+$bluetoothState = "לא ידוע"
+if ($stateOnEvidence.Count -gt 0 -and $stateOffEvidence.Count -gt 0) {
+    $bluetoothState = "CONFLICT"
+} elseif ($stateOnEvidence.Count -gt 0) {
     $bluetoothState = "ON"
-} elseif ($managerText -match '(?i)\bstate\s*:\s*OFF\b|\bBluetooth\s+(?:disabled|כבוי)\s*[:=]\s*(?:false|0|off)\b') {
+} elseif ($stateOffEvidence.Count -gt 0) {
     $bluetoothState = "OFF"
 }
 
