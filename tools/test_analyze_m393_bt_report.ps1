@@ -171,7 +171,34 @@ try {
         throw "Contradictory HFP client flags were incorrectly scored as positive evidence."
     }
 
-    Write-Host "Analyzer tests passed: positive, negative, disabled-service, service-only, unknown, and conflicting HFP Client evidence."
+    # Contradictory Bluetooth ON/OFF state must not be reduced to ON.
+    $stateConflictPath = Join-Path $tempRoot "bluetooth-state-conflict.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.android.bluetooth",
+        "",
+        "=== Package details: com.android.bluetooth ===",
+        "Package [com.android.bluetooth]",
+        "HeadsetClientService enabled=true",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "state: OFF",
+        "Profile: HEADSET_CLIENT enabled=true",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $stateConflictPath -Encoding UTF8
+    $stateConflict = (& $scriptPath -ReportPath $stateConflictPath) -join [Environment]::NewLine
+    Assert-Contains $stateConflict "Bluetooth: CONFLICT"
+    Assert-Contains $stateConflict "אין מספיק ראיות"
+    if ($stateConflict -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "Conflicting Bluetooth manager ON/OFF states were incorrectly summarized as positive."
+    }
+
+    Write-Host "Analyzer tests passed: positive, negative, disabled-service, service-only, unknown, conflicting HFP Client evidence, and conflicting Bluetooth ON/OFF states."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
