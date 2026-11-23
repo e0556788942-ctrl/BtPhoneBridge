@@ -144,6 +144,56 @@ try {
         throw "A profile mention without an enabled value was incorrectly scored as positive evidence."
     }
 
+    # Bare status words without a boolean value are ambiguous, not positive evidence.
+    $bareFlagPath = Join-Path $tempRoot "bare-flags.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.android.bluetooth",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "Profile: HEADSET_CLIENT enabled",
+        "Profile: HEADSET_CLIENT supported",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $bareFlagPath -Encoding UTF8
+    $bareFlags = (& $scriptPath -ReportPath $bareFlagPath) -join [Environment]::NewLine
+    Assert-Contains $bareFlags "נמצא אזכור HFP Client ללא ערך enabled מפורש במקטע Bluetooth manager"
+    Assert-Contains $bareFlags "אין מספיק ראיות"
+    if ($bareFlags -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "Bare enabled/supported status words were incorrectly treated as affirmative boolean evidence."
+    }
+
+    # Contradictory Bluetooth ON/OFF evidence must not be reduced to ON.
+    $stateConflictPath = Join-Path $tempRoot "bluetooth-state-conflict.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.android.bluetooth",
+        "",
+        "=== Package details: com.android.bluetooth ===",
+        "Package [com.android.bluetooth]",
+        "HeadsetClientService enabled=true",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "state: OFF",
+        "Profile: HEADSET_CLIENT enabled=true",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $stateConflictPath -Encoding UTF8
+    $stateConflict = (& $scriptPath -ReportPath $stateConflictPath) -join [Environment]::NewLine
+    Assert-Contains $stateConflict "Bluetooth: CONFLICT"
+    Assert-Contains $stateConflict "אין מספיק ראיות"
+    if ($stateConflict -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "Contradictory Bluetooth ON/OFF states were incorrectly summarized as positive."
+    }
+
     # Contradictory flags must be reported as mixed evidence, not a positive result.
     $mixedPath = Join-Path $tempRoot "mixed.txt"
     @(
