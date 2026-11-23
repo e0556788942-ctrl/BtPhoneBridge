@@ -45,11 +45,14 @@ foreach ($line in $lines) {
 $packages = @($candidateLines | ForEach-Object { $_.Trim() } |
     Where-Object { $_ -match '^[A-Za-z0-9_.]+$' } | Sort-Object -Unique)
 
+$stateOnEvidence = @($managerLines | Where-Object { $_ -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופעל)\s*[:=]\s*(?:true|1|on)\b' })
+$stateOffEvidence = @($managerLines | Where-Object { $_ -match '(?i)\bstate\s*:\s*OFF\b|\bBluetooth\s+(?:disabled|כבוי)\s*[:=]\s*(?:false|0|off)\b' })
 $bluetoothState = "לא ידוע"
-$managerText = $managerLines -join "\n"
-if ($managerText -match '(?i)\bstate\s*:\s*ON\b|\bBluetooth\s+(?:enabled|מופעל)\s*[:=]\s*(?:true|1|on)\b') {
+if ($stateOnEvidence.Count -gt 0 -and $stateOffEvidence.Count -gt 0) {
+    $bluetoothState = "CONFLICT"
+} elseif ($stateOnEvidence.Count -gt 0) {
     $bluetoothState = "ON"
-} elseif ($managerText -match '(?i)\bstate\s*:\s*OFF\b|\bBluetooth\s+(?:disabled|כבוי)\s*[:=]\s*(?:false|0|off)\b') {
+} elseif ($stateOffEvidence.Count -gt 0) {
     $bluetoothState = "OFF"
 }
 
@@ -70,7 +73,7 @@ if ($serviceLines.Count -gt 0) {
 # Package/component mentions (e.g. HeadsetClientService enabled=true) are not profile evidence.
 $clientProfileToken = '(?i)\bHEADSET_CLIENT\b|\bHFP_CLIENT\b|profile_supported_hfpclient|bluetooth\.profile\.hfp\.hf\.enabled|hfp_client_enabled'
 $clientProfileLines = @($managerLines | Where-Object { $_ -match $clientProfileToken })
-$clientEnabledFlag = '(?i)[:=]\s*(?:true|1)\b|\b(?:enabled|supported)\b(?!\s*[:=]\s*(?:false|0)\b)'
+$clientEnabledFlag = '(?i)\b(?:enabled|supported|active|available|profile_supported_hfpclient|hfp_client_enabled)\s*[:=]\s*(?:true|1)\b|\b(?:HEADSET_CLIENT|HFP_CLIENT)\s*[:=]\s*(?:true|1)\b'
 $clientDisabledFlag = '(?i)[:=]\s*(?:false|0)\b|\b(?:disabled|unsupported|not\s+supported)\b'
 $clientEnabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientEnabledFlag })
 $clientDisabledEvidence = @($clientProfileLines | Where-Object { $_ -match $clientDisabledFlag })
