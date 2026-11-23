@@ -41,3 +41,11 @@
 
 ## בדיקות
 `tools/test_analyze_m393_bt_report.ps1` מריץ דוחות מדומים: חיובי, שלילי, אזכור ללא ערך, ערכים סותרים, וגם מקרה regression שבו Package details מציג `HeadsetClientService enabled=true` אך Bluetooth manager אינו מציג ראיה לפרופיל HFP Client. הבדיקות אינן משתמשות בנגן אמיתי.
+
+
+## תיקון 2026-11-23 — ראיות Boolean מפורשות ומצב Bluetooth סותר
+
+- המנתח אינו מסווג עוד מילים בודדות כמו `enabled` או `supported` כרמז חיובי. נדרש ערך Boolean מפורש `true` או `1` בצמוד לשדה סטטוס/תמיכה או לפרופיל.
+- אם מקטע Bluetooth manager מכיל גם מצב ON וגם OFF, הסיכום מציג `CONFLICT` ולא בוחר אחד מהם.
+- נוספו בדיקות regression עבור שדות enabled/supported ללא ערך, ועבור מצב Bluetooth סותר לצד רמזי HFP/SCO חיוביים.
+- אלה בדיקות דוחות מדומים בלבד; הן אינן מאשרות את קושחת M393 או חיבור HFP פעיל.
