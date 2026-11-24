@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private boolean receiverRegistered;
     private boolean profilesRequested;
     private boolean micTestRequested;
+    private boolean discoveryPermissionFlow;
     private AudioTrack testTrack;
     private AudioRouting.OnRoutingChangedListener testTrackRouteListener;
     private AudioRecord audioRecord;
@@ -235,19 +236,10 @@ public class MainActivity extends Activity {
     }
 
     private void requestBluetoothPermissions() {
-        if (Build.VERSION.SDK_INT >= 31) {
-            List<String> missing = new ArrayList<>();
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
-                missing.add(Manifest.permission.BLUETOOTH_CONNECT);
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED)
-                missing.add(Manifest.permission.BLUETOOTH_SCAN);
-            if (!missing.isEmpty()) {
-                requestPermissions(missing.toArray(new String[0]), REQ_BT);
-                return;
-            }
-        } else if (Build.VERSION.SDK_INT >= 23 &&
-            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
+        // Paired-device diagnostics need CONNECT. Ask for SCAN only when the
+        // user explicitly starts discovery; denying SCAN must not block diagnostics.
+        if (Build.VERSION.SDK_INT >= 31 && !hasBtPermission()) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
             return;
         }
         runDiagnostics();
@@ -256,16 +248,47 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == REQ_BT) {
-            boolean granted = true;
-            for (int result : results) granted &= result == PackageManager.PERMISSION_GRANTED;
-            if (granted) runDiagnostics();
-            else { append("נדרשת הרשאת Nearby devices כדי לבדוק Bluetooth."); showReport(); }
+            boolean connectGranted = hasBtPermission();
+            boolean scanGranted = hasScanPermission();
+            BluetoothPermissionGate.Access access =
+                BluetoothPermissionGate.evaluate(connectGranted, scanGranted);
+            if (BluetoothPermissionGate.canRunDiagnostics(access)) {
+                runDiagnostics();
+            } else {
+                append("נדרשת הרשאת BLUETOOTH_CONNECT כדי לבדוק התקנים משויכים ופרופילים.");
+                showReport();
+            }
+
+            if (discoveryPermissionFlow) {
+                boolean connectWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_CONNECT);
+                boolean scanWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_SCAN);
+                if (!connectGranted) {
+                    discoveryPermissionFlow = false;
+                } else if (scanWasRequested) {
+                    discoveryPermissionFlow = false;
+                    if (BluetoothPermissionGate.canDiscover(access)) performDiscovery();
+                    else {
+                        append("הרשאת BLUETOOTH_SCAN לא אושרה; בדיקת התקנים משויכים ממשיכה, אך סריקה חדשה לא תתבצע.");
+                        showReport();
+                    }
+                } else if (connectWasRequested) {
+                    requestScanPermissionForDiscovery();
+                }
+            } else if (scanWasRequested && !scanGranted && connectGranted) {
+                append("הרשאת BLUETOOTH_SCAN לא אושרה; אפשר להמשיך לבדוק התקנים שכבר משויכים.");
+                showReport();
+            }
         } else if (code == REQ_LEGACY_LOCATION) {
             runDiagnostics();
-            append(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED
-                ? "הרשאת מיקום אושרה; היא נדרשת לסריקת Bluetooth בגרסאות Android 8–11."
-                : "הרשאת מיקום לא אושרה; ב-Android 8–11 ייתכן שלא ניתן יהיה לסרוק התקנים. התקנים משויכים עדיין ניתנים לבדיקה.");
-            showReport();
+            if (discoveryPermissionFlow) {
+                discoveryPermissionFlow = false;
+                if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                    performDiscovery();
+                } else {
+                    append("הרשאת מיקום לא אושרה; ב-Android 8–11 לא ניתן לבצע סריקת Bluetooth חדשה. התקנים משויכים עדיין ניתנים לבדיקה.");
+                    showReport();
+                }
+            }
         } else if (code == REQ_MIC) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) runMicTest();
             else { append("הרשאת מיקרופון לא אושרה; לא בוצעה בדיקת מיקרופון."); showReport(); }
@@ -493,16 +516,50 @@ public class MainActivity extends Activity {
     }
 
     private void startDiscovery() {
-        if (adapter == null || !hasBtPermission()) {
-            append("אין מתאם Bluetooth או חסרה הרשאת Nearby devices.");
+        if (adapter == null) {
+            append("לא נמצא מתאם Bluetooth.");
             showReport();
             return;
         }
-        if (!hasScanPermission()) {
-            if (Build.VERSION.SDK_INT >= 31)
+        discoveryPermissionFlow = true;
+        if (Build.VERSION.SDK_INT >= 31) {
+            BluetoothPermissionGate.Access access =
+                BluetoothPermissionGate.evaluate(hasBtPermission(), hasScanPermission());
+            if (access == BluetoothPermissionGate.Access.CONNECT_REQUIRED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
+                return;
+            }
+            if (access == BluetoothPermissionGate.Access.DIAGNOSTICS_ONLY) {
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT);
-            else
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
+                return;
+            }
+            discoveryPermissionFlow = false;
+            performDiscovery();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 23 && !hasScanPermission()) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
+            return;
+        }
+        discoveryPermissionFlow = false;
+        performDiscovery();
+    }
+
+    private void requestScanPermissionForDiscovery() {
+        if (Build.VERSION.SDK_INT >= 31 && !hasScanPermission()) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT);
+        } else if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 31 && !hasScanPermission()) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LEGACY_LOCATION);
+        } else {
+            discoveryPermissionFlow = false;
+            performDiscovery();
+        }
+    }
+
+    private void performDiscovery() {
+        if (adapter == null || !hasBtPermission() || !hasScanPermission()) {
+            append("סריקה לא התחילה: חסרה הרשאת Bluetooth מתאימה.");
+            showReport();
             return;
         }
         try {
