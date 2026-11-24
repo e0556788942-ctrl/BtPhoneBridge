@@ -259,9 +259,9 @@ public class MainActivity extends Activity {
                 showReport();
             }
 
+            boolean connectWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_CONNECT);
+            boolean scanWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_SCAN);
             if (discoveryPermissionFlow) {
-                boolean connectWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_CONNECT);
-                boolean scanWasRequested = Arrays.asList(permissions).contains(Manifest.permission.BLUETOOTH_SCAN);
                 if (!connectGranted) {
                     discoveryPermissionFlow = false;
                 } else if (scanWasRequested) {
