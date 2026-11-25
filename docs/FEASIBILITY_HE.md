@@ -288,3 +288,26 @@ Android 12 ומעלה כולל יכולות Combined Audio Routing, אולם ת�
 - ב-Android 8–11 הרשאת `ACCESS_FINE_LOCATION` מתבקשת רק בעת סריקה, ולא בעת פתיחת מסך האבחון.
 - נוספו בדיקות יחידה למצב CONNECT בלבד, CONNECT+SCAN, SCAN ללא CONNECT, וללא הרשאות.
 - זהו תיקון של זרימת ההרשאות בלבד. הוא אינו מוסיף HFP Client ואינו משנה את מגבלות קושחת M393.
+
+
+## עדכון 2026-11-25 — איסוף מאפייני תפקידי HFP ישירות מ-getprop
+
+כלי ADB קורא כעת גם את שני מאפייני המערכת שמוגדרים ב-AOSP BluetoothProperties.sysprop ונקבעים על ידי vendor overlay בעת אתחול Bluetooth:
+
+- `bluetooth.profile.hfp.hf.enabled` — תפקיד HFP Hands-Free (HF), הנדרש לנגן כדי להתחבר לטלפון שמשמש Audio Gateway.
+- `bluetooth.profile.hfp.ag.enabled` — תפקיד HFP Audio Gateway (AG), הנדרש לנגן כדי לשמש Audio Gateway מול אוזניות Hands-Free.
+
+הערכים נאספים בקטע `Bluetooth HFP role system properties` בדוח. אם `getprop` מחזיר מחרוזת ריקה או שהמאפיין אינו נחשף, הדוח מציין זאת כ-"empty or not exposed"; אין לפרש זאת כ-`false`.
+
+מנתח הדוח מציג בנפרד את מצב HF ואת מצב AG:
+- `true/1` — רמז לכך שתפקיד זה מוגדר בתצורת Bluetooth של המערכת.
+- `false/0` — רמז לכך שתפקיד זה אינו מופעל בתצורה שנחשפה.
+- ערכים סותרים — CONFLICT.
+- ערך חסר/לא בוליאני — UNKNOWN.
+
+גם ערך `true` אינו הוכחה שהשירות עלה, שהטלפון התחבר, ששני תפקידי HFP פועלים במקביל, או ש-SCO דו-כיווני וניתוב בין הקישורים עובדים. כדי לאמת זאת נדרשת בדיקת חיבור פיזית מול הטלפון והאוזניות; ייתכן שגם נדרשת התאמת ROM/אפליקציית מערכת privileged.
+
+נוספו בדיקות mock לאיסוף שני המאפיינים ובדיקות analyzer למצבים חיובי, שלילי, חסר וסותר. הבדיקות האוטומטיות אינן מחליפות דוח אמיתי מה-M393.
+
+מקור AOSP:
+https://android.googlesource.com/platform/system/libsysprop/+/refs/heads/android13-release/srcs/android/sysprop/BluetoothProperties.sysprop
