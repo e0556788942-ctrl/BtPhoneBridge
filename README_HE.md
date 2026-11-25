@@ -137,3 +137,12 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 הכלי קורא קובץ בלבד ואינו מפעיל ADB או משנה את הנגן. הוא מסכם מצב Bluetooth, חבילות Bluetooth מועמדות, אזכור HeadsetClientService, אזכור HEADSET_CLIENT, וממצאי מדיניות SCO לכניסה/יציאה. **כל אלה הם רמזי מערכת בלבד ואינם מוכיחים HFP Client פעיל, שני קישורי HFP במקביל או גישור שיחה.**
 
 הוראות מלאות: [docs/ADB_REPORT_ANALYZER_HE.md](docs/ADB_REPORT_ANALYZER_HE.md). בדיקות אופליין: `tools/test_analyze_m393_bt_report.ps1`.
+
+
+## בדיקת תפקידי HFP דרך מאפייני מערכת (2026-11-25)
+
+כלי ADB אוסף כעת גם את:
+- `bluetooth.profile.hfp.hf.enabled` — תפקיד Hands-Free של הנגן מול הטלפון.
+- `bluetooth.profile.hfp.ag.enabled` — תפקיד Audio Gateway של הנגן מול האוזניות.
+
+הערכים מופיעים בקטע `Bluetooth HFP role system properties` ומנותחים בנפרד. ערך ריק הוא "לא נחשף/לא ידוע", לא false. גם true הוא רמז לתצורת המערכת בלבד ואינו הוכחת חיבור או פעולה במקביל. ראו [מסמך ההיתכנות](docs/FEASIBILITY_HE.md).
