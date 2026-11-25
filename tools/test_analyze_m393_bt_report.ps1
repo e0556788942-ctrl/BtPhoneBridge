@@ -6,7 +6,9 @@ New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
 function Assert-Contains {
     param([string]$Text, [string]$Expected)
-    if (-not $Text.Contains($Expected)) { throw "Expected summary to contain: $Expected" }
+    if (-not $Text.Contains($Expected)) {
+        throw "Expected summary to contain: $Expected`nActual summary:`n$Text"
+    }
 }
 
 try {
