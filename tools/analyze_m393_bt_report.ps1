@@ -31,6 +31,7 @@ function Get-SectionLines {
 $managerLines = @(Get-SectionLines -SectionName "Bluetooth manager")
 $audioPolicyLines = @(Get-SectionLines -SectionName "Audio policy")
 $candidateLines = @(Get-SectionLines -SectionName "Candidate system Bluetooth packages")
+$hfpRolePropertyLines = @(Get-SectionLines -SectionName "Bluetooth HFP role system properties")
 
 $packageDetailLines = New-Object System.Collections.Generic.List[string]
 $insidePackage = $false
