@@ -6,7 +6,9 @@ New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
 function Assert-Contains {
     param([string]$Text, [string]$Expected)
-    if (-not $Text.Contains($Expected)) { throw "Expected summary to contain: $Expected" }
+    if (-not $Text.Contains($Expected)) {
+        throw "Expected summary to contain: $Expected`nActual summary:`n$Text"
+    }
 }
 
 try {
@@ -16,6 +18,10 @@ try {
         "PhoneLink M393 - read-only ADB diagnostics",
         "=== Candidate system Bluetooth packages ===",
         "com.vendor.bluetooth",
+        "",
+        "=== Bluetooth HFP role system properties ===",
+        "bluetooth.profile.hfp.hf.enabled = true",
+        "bluetooth.profile.hfp.ag.enabled = true",
         "",
         "=== Package details: com.vendor.bluetooth ===",
         "Package [com.vendor.bluetooth]",
@@ -34,6 +40,8 @@ try {
     Assert-Contains $positive "com.vendor.bluetooth"
     Assert-Contains $positive "HeadsetClientService: נמצא"
     Assert-Contains $positive "enabled=true"
+    Assert-Contains $positive "HFP HF role property: נמצא ערך true/1 למאפיין HFP HF"
+    Assert-Contains $positive "HFP AG role property: נמצא ערך true/1 למאפיין HFP AG"
     Assert-Contains $positive "HFP Client indication: נמצא ערך true/enabled במקטע Bluetooth manager"
     Assert-Contains $positive "מדיניות SCO יציאה: נמצא"
     Assert-Contains $positive "מדיניות SCO כניסה: נמצא"
@@ -45,6 +53,10 @@ try {
         "PhoneLink M393 - read-only ADB diagnostics",
         "=== Candidate system Bluetooth packages ===",
         "com.android.bluetooth",
+        "",
+        "=== Bluetooth HFP role system properties ===",
+        "bluetooth.profile.hfp.hf.enabled = false",
+        "bluetooth.profile.hfp.ag.enabled = true",
         "",
         "=== Package details: com.android.bluetooth ===",
         "Package [com.android.bluetooth]",
@@ -60,6 +72,8 @@ try {
     Assert-Contains $negative "Bluetooth: OFF"
     Assert-Contains $negative "HeadsetClientService: לא נמצא"
     Assert-Contains $negative "לא נמצא בדוח המסונן"
+    Assert-Contains $negative "HFP HF role property: נמצא ערך false/0 למאפיין HFP HF"
+    Assert-Contains $negative "HFP AG role property: נמצא ערך true/1 למאפיין HFP AG"
     Assert-Contains $negative "HFP Client indication: נמצא ערך false/disabled במקטע Bluetooth manager"
     Assert-Contains $negative "אין מספיק ראיות"
     if ($negative -match "נמצאו ערכים סותרים") { throw "A disabled-only profile line was incorrectly classified as conflicting evidence." }
@@ -221,7 +235,42 @@ try {
         throw "Contradictory HFP client flags were incorrectly scored as positive evidence."
     }
 
-    Write-Host "Analyzer tests passed: positive, negative, disabled-service, service-only, unknown, and conflicting HFP Client evidence."
+    # Contradictory vendor role property values must remain inconclusive.
+    $roleConflictPath = Join-Path $tempRoot "hfp-role-property-conflict.txt"
+    @(
+        "PhoneLink M393 - read-only ADB diagnostics",
+        "=== Candidate system Bluetooth packages ===",
+        "com.vendor.bluetooth",
+        "",
+        "=== Bluetooth HFP role system properties ===",
+        "bluetooth.profile.hfp.hf.enabled = true",
+        "bluetooth.profile.hfp.hf.enabled = false",
+        "bluetooth.profile.hfp.ag.enabled = true",
+        "",
+        "=== Package details: com.vendor.bluetooth ===",
+        "Package [com.vendor.bluetooth]",
+        "HeadsetClientService enabled=true",
+        "",
+        "=== Bluetooth manager ===",
+        "state: ON",
+        "Profile: HEADSET_CLIENT enabled=true",
+        "",
+        "=== Audio policy ===",
+        "AUDIO_DEVICE_OUT_BLUETOOTH_SCO",
+        "AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+    ) | Set-Content -LiteralPath $roleConflictPath -Encoding UTF8
+    $roleConflict = (& $scriptPath -ReportPath $roleConflictPath) -join [Environment]::NewLine
+    Assert-Contains $roleConflict "HFP HF role property: נמצאו ערכים סותרים"
+    Assert-Contains $roleConflict "אין מספיק ראיות"
+    if ($roleConflict -match "קיימים רמזים מערכתיים חיוביים") {
+        throw "Contradictory HFP HF sysprop values were incorrectly summarized as positive."
+    }
+
+    # A missing sysprop is unknown, never an implicit false or positive.
+    Assert-Contains $unknown "HFP HF role property: המאפיין לא נחשף"
+    Assert-Contains $unknown "HFP AG role property: המאפיין לא נחשף"
+
+    Write-Host "Analyzer tests passed: HFP HF/AG role properties positive, negative, unknown and conflicting; existing Bluetooth/HFP evidence cases."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }

@@ -74,6 +74,19 @@ foreach ($prop in @(
 }
 $sections.Add("")
 
+# These AOSP sysprops are vendor-overlay inputs read by Bluetooth during initialization.
+# Empty output means absent/not exposed; it must not be interpreted as false.
+$sections.Add("=== Bluetooth HFP role system properties ===")
+foreach ($prop in @(
+    "bluetooth.profile.hfp.hf.enabled",
+    "bluetooth.profile.hfp.ag.enabled"
+)) {
+    $value = Get-AdbShellText -CommandArgs @("getprop", $prop)
+    if ([string]::IsNullOrWhiteSpace($value)) { $value = "(empty or not exposed)" }
+    $sections.Add("$prop = $value")
+}
+$sections.Add("")
+
 # Discover vendor-specific Bluetooth package names instead of assuming AOSP's package name.
 $packageList = Get-AdbShellText -CommandArgs @("cmd", "package", "list", "packages", "-s")
 if ($packageList -match "(?i)unknown command|can't find service|not found") {

@@ -31,6 +31,7 @@ function Get-SectionLines {
 $managerLines = @(Get-SectionLines -SectionName "Bluetooth manager")
 $audioPolicyLines = @(Get-SectionLines -SectionName "Audio policy")
 $candidateLines = @(Get-SectionLines -SectionName "Candidate system Bluetooth packages")
+$hfpRolePropertyLines = @(Get-SectionLines -SectionName "Bluetooth HFP role system properties")
 
 $packageDetailLines = New-Object System.Collections.Generic.List[string]
 $insidePackage = $false
@@ -54,6 +55,35 @@ if ($stateOnEvidence.Count -gt 0 -and $stateOffEvidence.Count -gt 0) {
     $bluetoothState = "ON"
 } elseif ($stateOffEvidence.Count -gt 0) {
     $bluetoothState = "OFF"
+}
+
+function Get-HfpRolePropertyState {
+    param([string]$PropertyName)
+    $pattern = '^\s*' + [regex]::Escape($PropertyName) + '\s*=\s*(true|false|1|0)\s*$'
+    $values = @($hfpRolePropertyLines | ForEach-Object {
+        if ($_ -match $pattern) { $Matches[1].ToLowerInvariant() }
+    })
+    $positive = @($values | Where-Object { $_ -eq "true" -or $_ -eq "1" })
+    $negative = @($values | Where-Object { $_ -eq "false" -or $_ -eq "0" })
+    if ($positive.Count -gt 0 -and $negative.Count -gt 0) { return "CONFLICT" }
+    if ($positive.Count -gt 0) { return "TRUE" }
+    if ($negative.Count -gt 0) { return "FALSE" }
+    return "UNKNOWN"
+}
+
+$hfRolePropertyState = Get-HfpRolePropertyState -PropertyName "bluetooth.profile.hfp.hf.enabled"
+$agRolePropertyState = Get-HfpRolePropertyState -PropertyName "bluetooth.profile.hfp.ag.enabled"
+$hfRolePropertyFinding = switch ($hfRolePropertyState) {
+    "TRUE" { "נמצא ערך true/1 למאפיין HFP HF (רמז לתצורת מערכת בלבד; לא הוכחת חיבור)" }
+    "FALSE" { "נמצא ערך false/0 למאפיין HFP HF (רמז לתצורת מערכת בלבד)" }
+    "CONFLICT" { "נמצאו ערכים סותרים למאפיין HFP HF (לא מכריע)" }
+    default { "המאפיין לא נחשף או ללא ערך בוליאני בדוח (לא מכריע)" }
+}
+$agRolePropertyFinding = switch ($agRolePropertyState) {
+    "TRUE" { "נמצא ערך true/1 למאפיין HFP AG (רמז לתצורת מערכת בלבד; לא הוכחת חיבור)" }
+    "FALSE" { "נמצא ערך false/0 למאפיין HFP AG (רמז לתצורת מערכת בלבד)" }
+    "CONFLICT" { "נמצאו ערכים סותרים למאפיין HFP AG (לא מכריע)" }
+    default { "המאפיין לא נחשף או ללא ערך בוליאני בדוח (לא מכריע)" }
 }
 
 $serviceLines = @($packageDetailLines | Where-Object { $_ -match '(?i)HeadsetClientService' })
@@ -96,10 +126,12 @@ $summary.Add("PhoneLink — סיכום דוח ADB (ניתוח לא מקוון)")
 $summary.Add("Bluetooth: $bluetoothState")
 $summary.Add("חבילות Bluetooth מועמדות: " + $(if ($packages.Count) { $packages -join ", " } else { "לא נמצאו בקטע הדוח" }))
 $summary.Add("HeadsetClientService: $serviceFinding")
+$summary.Add("HFP HF role property: $hfRolePropertyFinding")
+$summary.Add("HFP AG role property: $agRolePropertyFinding")
 $summary.Add("HFP Client indication: $clientProfileFinding")
 $summary.Add("מדיניות SCO יציאה: " + $(if ($scoOut) { "נמצא בקטע Audio policy" } else { "לא נמצא בדוח המסונן (לא מכריע)" }))
 $summary.Add("מדיניות SCO כניסה: " + $(if ($scoIn) { "נמצא בקטע Audio policy" } else { "לא נמצא בדוח המסונן (לא מכריע)" }))
-if ($bluetoothState -eq "ON" -and $serviceEnabledHint -and $clientProfilePositive -and $scoOut -and $scoIn) {
+if ($bluetoothState -eq "ON" -and $hfRolePropertyState -eq "TRUE" -and $serviceEnabledHint -and $clientProfilePositive -and $scoOut -and $scoIn) {
     $summary.Add("הערכת סיכום: קיימים רמזים מערכתיים חיוביים; נדרשת בדיקת חיבור HFP Client ושמע פיזית.")
 } else {
     $summary.Add("הערכת סיכום: אין מספיק ראיות בדוח המסונן; נדרשת בדיקת מכשיר/יצרן.")

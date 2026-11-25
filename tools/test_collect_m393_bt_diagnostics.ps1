@@ -29,6 +29,8 @@ function adb {
             "getprop ro.build.version.release" { Write-Output "13"; return }
             "getprop ro.build.version.sdk" { Write-Output "33"; return }
             "getprop ro.build.version.security_patch" { Write-Output "2026-10-01"; return }
+            "getprop bluetooth.profile.hfp.hf.enabled" { Write-Output "true"; return }
+            "getprop bluetooth.profile.hfp.ag.enabled" { Write-Output "true"; return }
             "cmd package list packages -s" {
                 Write-Output "package:com.vendor.bluetooth"
                 Write-Output "package:com.vendor.settings"
@@ -92,6 +94,8 @@ try {
     foreach ($required in @(
         "M393",
         "com.vendor.bluetooth",
+        "bluetooth.profile.hfp.hf.enabled = true",
+        "bluetooth.profile.hfp.ag.enabled = true",
         "HeadsetClientService",
         "Running activity services related to Bluetooth/audio",
         "Audio policy",
