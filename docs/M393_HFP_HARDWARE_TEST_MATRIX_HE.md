@@ -28,13 +28,13 @@ UUID הוא ראיית SDP על שירות שההתקן מפרסם. הוא אי�
 מתיקיית המאגר ב-PowerShell:
 
 ```powershell
-.\\tools\\collect_m393_bt_diagnostics.ps1
+.\tools\collect_m393_bt_diagnostics.ps1
 ```
 
 לאחר מכן נתח את הדוח:
 
 ```powershell
-.\\tools\\analyze_m393_bt_report.ps1 -ReportPath .\\PhoneLink_M393_ADB_YYYYMMDD_HHMMSS.txt
+.\tools\analyze_m393_bt_report.ps1 -ReportPath .\PhoneLink_M393_ADB_YYYYMMDD_HHMMSS.txt
 ```
 
 יש להחליף את שם הקובץ בשם הדוח שנוצר.
