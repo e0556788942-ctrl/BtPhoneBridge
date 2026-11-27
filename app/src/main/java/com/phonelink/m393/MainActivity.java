@@ -36,6 +36,8 @@ public class MainActivity extends Activity {
     private final List<AudioDeviceInfo> communicationDevices = new ArrayList<>();
     private boolean receiverRegistered;
     private boolean profilesRequested;
+    private final ProfileProxyRequestTracker profileProxyRequests = new ProfileProxyRequestTracker();
+    private Runnable profileProxyTimeout;
     private boolean micTestRequested;
     private boolean discoveryPermissionFlow;
     private AudioTrack testTrack;
@@ -475,7 +477,13 @@ public class MainActivity extends Activity {
         if (headsetProxy != null) appendProfile("HFP Headset/AG (הנגן מול אוזניות)", headsetProxy);
         if (a2dpProxy != null) appendProfile("A2DP (מדיה)", a2dpProxy);
         if (profilesRequested) return;
+
+        final boolean needHeadset = headsetProxy == null;
+        final boolean needA2dp = a2dpProxy == null;
+        if (!needHeadset && !needA2dp) return;
+
         profilesRequested = true;
+        profileProxyRequests.begin(needHeadset, needA2dp);
         BluetoothProfile.ServiceListener listener = new BluetoothProfile.ServiceListener() {
             @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
                 if (profile == BluetoothProfile.HEADSET) {
@@ -485,21 +493,70 @@ public class MainActivity extends Activity {
                     a2dpProxy = (BluetoothA2dp)proxy;
                     appendProfile("A2DP (מדיה)", a2dpProxy);
                 }
+                profileProxyRequests.complete(profile);
+                finishProfileProxyRequestsIfIdle();
                 showReport();
             }
             @Override public void onServiceDisconnected(int profile) {
                 if (profile == BluetoothProfile.HEADSET) headsetProxy = null;
                 if (profile == BluetoothProfile.A2DP) a2dpProxy = null;
-                profilesRequested = false;
+                profileProxyRequests.complete(profile);
+                finishProfileProxyRequestsIfIdle();
                 append("שירות Bluetooth נותק: " + profile);
                 showReport();
             }
         };
         try {
-            adapter.getProfileProxy(this, listener, BluetoothProfile.HEADSET);
-            adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP);
+            if (needHeadset) {
+                boolean accepted = adapter.getProfileProxy(this, listener, BluetoothProfile.HEADSET);
+                if (!accepted) {
+                    profileProxyRequests.complete(BluetoothProfile.HEADSET);
+                    append("בקשת שירות HFP Headset לא התקבלה על ידי Android; אפשר לנסות שוב בבדיקת מצב הבאה.");
+                }
+            }
+            if (needA2dp) {
+                boolean accepted = adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP);
+                if (!accepted) {
+                    profileProxyRequests.complete(BluetoothProfile.A2DP);
+                    append("בקשת שירות A2DP לא התקבלה על ידי Android; אפשר לנסות שוב בבדיקת מצב הבאה.");
+                }
+            }
         } catch (Exception e) {
-            append("שגיאה בבדיקת פרופילים: " + e.getMessage());
+            profileProxyRequests.reset();
+            finishProfileProxyRequestsIfIdle();
+            append("שגיאה בבקשת שירותי Bluetooth: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+
+        if (!profileProxyRequests.hasPending()) {
+            finishProfileProxyRequestsIfIdle();
+            append("Android לא קיבל אף בקשת Profile Proxy; ניסיון נוסף יתאפשר בבדיקת מצב הבאה.");
+            return;
+        }
+
+        profileProxyTimeout = () -> {
+            if (profileProxyRequests.hasPending()) {
+                Set<Integer> pending = profileProxyRequests.pendingProfiles();
+                profileProxyRequests.reset();
+                profilesRequested = false;
+                append("לא התקבל callback עבור שירותי Bluetooth בתוך 15 שניות: " +
+                    pending.stream().map(id -> id == BluetoothProfile.HEADSET ? "HFP Headset" :
+                        id == BluetoothProfile.A2DP ? "A2DP" : "פרופיל " + id)
+                        .collect(java.util.stream.Collectors.joining(", ")) +
+                    ". אפשר ללחוץ שוב על בדיקת מצב.");
+                showReport();
+            }
+            profileProxyTimeout = null;
+        };
+        mainHandler.postDelayed(profileProxyTimeout, 15000);
+    }
+
+    private void finishProfileProxyRequestsIfIdle() {
+        if (profileProxyRequests.hasPending()) return;
+        profilesRequested = false;
+        if (profileProxyTimeout != null) {
+            mainHandler.removeCallbacks(profileProxyTimeout);
+            profileProxyTimeout = null;
         }
     }
 
@@ -937,6 +994,10 @@ public class MainActivity extends Activity {
         }
         for (Runnable timeout : uuidTimeouts.values()) mainHandler.removeCallbacks(timeout);
         uuidTimeouts.clear();
+        if (profileProxyTimeout != null) mainHandler.removeCallbacks(profileProxyTimeout);
+        profileProxyTimeout = null;
+        profileProxyRequests.reset();
+        profilesRequested = false;
         uuidRequests.clear();
         try { if (adapter != null && adapter.isDiscovering()) adapter.cancelDiscovery(); } catch (Exception ignored) {}
         if (receiverRegistered) {
