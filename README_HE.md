@@ -1,6 +1,6 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 1.1):
+האפליקציה בודקת (גרסה 1.2):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
 - בדיקה פסיבית של רכיב HeadsetClientService בחבילת com.android.bluetooth, כולל מצב ההפעלה לפי PackageManager והגדרות רכיב; זו בדיקת הצהרה בלבד, לא בדיקת זמינות HFP Client בזמן ריצה.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
@@ -10,6 +10,16 @@
 - התקני שמע לכניסה/יציאה והתקני תקשורת הזמינים ל-Android.
 - בקשת בחירת התקן תקשורת דרך AudioManager.setCommunicationDevice (Android 12+).
 - צליל בדיקה ומדידת עוצמת מיקרופון מקומית ל-3 שניות; לא נשמר קובץ שמע.
+
+## שיפור גרסה 1.2 (2026-11-27) — עמידות בקבלת Profile Proxy
+
+- האפליקציה בודקת את ערך ההחזרה של `BluetoothAdapter.getProfileProxy()` עבור HEADSET ו-A2DP. בקשה ש-Android דחה אינה נשארת במצב pending.
+- נשלחות בקשות רק לפרופילים שה-proxy שלהם עדיין חסר.
+- אם Android מקבל בקשה אך לא מחזיר callback בתוך 15 שניות, הדוח מציין timeout ומאפשר ניסיון חוזר בלחיצה על "בדיקת מצב ועדכון דוח".
+- מעקב הבקשות מנקה timeout ומשתחרר בעת סגירת Activity.
+- נוספו בדיקות יחידה למצבי שתי בקשות, בקשה חלקית, דחיית בקשות, callback כפול ואיפוס.
+
+השיפור מטפל באבחון של פרופילי HEADSET/A2DP בלבד. הוא אינו מוסיף HFP Client מול הטלפון, אינו יוצר גישור שמע ואינו מוכיח Dual-HFP.
 
 ## מה האפליקציה לא עושה
 - לא מחייגת ולא עונה לשיחות.
@@ -48,7 +58,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 1.1 (versionCode 11).
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 1.2 (versionCode 12).
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
