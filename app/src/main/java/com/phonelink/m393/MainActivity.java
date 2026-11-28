@@ -517,14 +517,14 @@ public class MainActivity extends Activity {
             if (needHeadset) {
                 boolean accepted = adapter.getProfileProxy(this, listener, BluetoothProfile.HEADSET);
                 if (!accepted) {
-                    profileProxyRequests.complete(BluetoothProfile.HEADSET);
+                    profileProxyRequests.complete(requestGeneration, BluetoothProfile.HEADSET);
                     append("בקשת שירות HFP Headset לא התקבלה על ידי Android; אפשר לנסות שוב בבדיקת מצב הבאה.");
                 }
             }
             if (needA2dp) {
                 boolean accepted = adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP);
                 if (!accepted) {
-                    profileProxyRequests.complete(BluetoothProfile.A2DP);
+                    profileProxyRequests.complete(requestGeneration, BluetoothProfile.A2DP);
                     append("בקשת שירות A2DP לא התקבלה על ידי Android; אפשר לנסות שוב בבדיקת מצב הבאה.");
                 }
             }
