@@ -6,54 +6,87 @@ import static org.junit.Assert.*;
 public class ProfileProxyRequestTrackerTest {
     @Test public void waitsForBothAcceptedProfileCallbacks() {
         ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
-        tracker.begin(true, true);
+        long generation = tracker.begin(true, true);
 
         assertTrue(tracker.hasPending());
-        tracker.complete(ProfileProxyRequestTracker.HEADSET);
+        assertTrue(tracker.complete(generation, ProfileProxyRequestTracker.HEADSET));
         assertTrue(tracker.hasPending());
         assertTrue(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.A2DP));
 
-        tracker.complete(ProfileProxyRequestTracker.A2DP);
+        assertTrue(tracker.complete(generation, ProfileProxyRequestTracker.A2DP));
         assertFalse(tracker.hasPending());
     }
 
     @Test public void tracksOnlyProfilesThatNeedARequest() {
         ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
-        tracker.begin(false, true);
+        long generation = tracker.begin(false, true);
 
         assertTrue(tracker.hasPending());
         assertFalse(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.HEADSET));
         assertTrue(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.A2DP));
 
-        tracker.complete(ProfileProxyRequestTracker.A2DP);
+        assertTrue(tracker.complete(generation, ProfileProxyRequestTracker.A2DP));
         assertFalse(tracker.hasPending());
     }
 
     @Test public void rejectedRequestsLeaveTrackerReadyForRetry() {
         ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
-        tracker.begin(false, false);
+        long emptyGeneration = tracker.begin(false, false);
 
         assertFalse(tracker.hasPending());
-        tracker.begin(true, false);
+        assertTrue(tracker.isCurrent(emptyGeneration));
+
+        long retryGeneration = tracker.begin(true, false);
         assertTrue(tracker.hasPending());
+        assertFalse(tracker.isCurrent(emptyGeneration));
+        assertTrue(tracker.isCurrent(retryGeneration));
     }
 
     @Test public void duplicateAndUnknownCallbacksAreIdempotent() {
         ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
-        tracker.begin(true, false);
+        long generation = tracker.begin(true, false);
 
-        tracker.complete(ProfileProxyRequestTracker.A2DP);
+        assertFalse(tracker.complete(generation, ProfileProxyRequestTracker.A2DP));
         assertTrue(tracker.hasPending());
-        tracker.complete(ProfileProxyRequestTracker.HEADSET);
-        tracker.complete(ProfileProxyRequestTracker.HEADSET);
+        assertTrue(tracker.complete(generation, ProfileProxyRequestTracker.HEADSET));
+        assertFalse(tracker.complete(generation, ProfileProxyRequestTracker.HEADSET));
         assertFalse(tracker.hasPending());
     }
 
-    @Test public void resetClearsPendingRequests() {
+    @Test public void resetClearsPendingRequestsAndInvalidatesGeneration() {
         ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
-        tracker.begin(true, true);
-        tracker.reset();
+        long generation = tracker.begin(true, true);
+
+        assertTrue(tracker.reset(generation));
+        assertFalse(tracker.isCurrent(generation));
         assertFalse(tracker.hasPending());
         assertTrue(tracker.pendingProfiles().isEmpty());
+    }
+
+    @Test public void lateCallbackFromTimedOutBatchCannotCompleteNewBatch() {
+        ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
+        long oldGeneration = tracker.begin(true, false);
+        assertTrue(tracker.reset(oldGeneration));
+
+        long currentGeneration = tracker.begin(true, true);
+        assertFalse(tracker.isCurrent(oldGeneration));
+        assertFalse(tracker.complete(oldGeneration, ProfileProxyRequestTracker.HEADSET));
+
+        assertTrue(tracker.isCurrent(currentGeneration));
+        assertTrue(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.HEADSET));
+        assertTrue(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.A2DP));
+    }
+
+    @Test public void staleTimeoutCannotResetNewerBatch() {
+        ProfileProxyRequestTracker tracker = new ProfileProxyRequestTracker();
+        long oldGeneration = tracker.begin(true, false);
+        assertTrue(tracker.reset(oldGeneration));
+
+        long currentGeneration = tracker.begin(false, true);
+        assertFalse(tracker.reset(oldGeneration));
+
+        assertTrue(tracker.isCurrent(currentGeneration));
+        assertTrue(tracker.hasPending());
+        assertTrue(tracker.pendingProfiles().contains(ProfileProxyRequestTracker.A2DP));
     }
 }

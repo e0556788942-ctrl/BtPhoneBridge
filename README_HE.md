@@ -1,6 +1,6 @@
 # PhoneLink M393 — אבטיפוס אבחון
 
-האפליקציה בודקת (גרסה 1.2):
+האפליקציה בודקת (גרסה 1.3):
 - דגם וגרסת Android, וכן תכונות מערכת Bluetooth Classic/LE, Telephony ומיקרופון.
 - בדיקה פסיבית של רכיב HeadsetClientService בחבילת com.android.bluetooth, כולל מצב ההפעלה לפי PackageManager והגדרות רכיב; זו בדיקת הצהרה בלבד, לא בדיקת זמינות HFP Client בזמן ריצה.
 - מכשירי Bluetooth משויכים וסריקה של מכשירים קרובים.
@@ -11,7 +11,7 @@
 - בקשת בחירת התקן תקשורת דרך AudioManager.setCommunicationDevice (Android 12+).
 - צליל בדיקה ומדידת עוצמת מיקרופון מקומית ל-3 שניות; לא נשמר קובץ שמע.
 
-## שיפור גרסה 1.2 (2026-11-27) — עמידות בקבלת Profile Proxy
+## שיפור גרסה 1.3 (2026-11-27) — עמידות בקבלת Profile Proxy
 
 - האפליקציה בודקת את ערך ההחזרה של `BluetoothAdapter.getProfileProxy()` עבור HEADSET ו-A2DP. בקשה ש-Android דחה אינה נשארת במצב pending.
 - נשלחות בקשות רק לפרופילים שה-proxy שלהם עדיין חסר.
@@ -58,7 +58,7 @@
 GitHub Actions מריץ תחילה `testDebugUnitTest`. בדיקות היחידה בודקות את מיפוי UUID של HFP/HSP/A2DP בלבד; הן אינן מדמות חיבור Bluetooth או שיחה.
 
 ## בנייה
-הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 1.2 (versionCode 12).
+הפרויקט משתמש ב-Java 17, Android Gradle Plugin 8.7.3, Gradle 8.9, compileSdk 35, minSdk 26 ו-targetSdk 33. גרסת האבחון הנוכחית: 1.2 (versionCode 13).
 GitHub Actions בונה APK מסוג debug ושומר אותו כ-artifact בשם phonelink-m393-diagnostic-apk.
 
 ## פירוש UUID
@@ -163,3 +163,18 @@ UUID מצביע על שירות שהמכשיר מפרסם ב-SDP. הוא מסי�
 נוסף מסמך עבודה מדורג שמפריד בין תצורת HFP HF/AG של ה-M393, תפקידי SDP של הטלפון והאוזניות, חיבור כל צד בנפרד, חיבור כפול בו-זמני ובדיקת שמע דו-כיוונית בשיחה. לכל שלב מוגדרים תנאי PASS/FAIL/UNKNOWN, דרישות מערכת, מגבלות ה-API הציבורי ותבנית תוצאות ללא כתובות MAC או פרטים אישיים.
 
 ראו [מטריצת אימות החומרה בעברית](docs/M393_HFP_HARDWARE_TEST_MATRIX_HE.md). המסמך אינו משנה את קוד האפליקציה ואינו טוען שנבדקה חומרת M393.
+
+
+## עדכון 2026-11-28 — הגנה מפני callback מאוחר של Profile Proxy (גרסה 1.3)
+
+נמצא מרוץ אפשרי בזרימת Profile Proxy: לאחר timeout, המשתמש יכול לבקש שוב את HEADSET/A2DP לפני שה-callback הישן הגיע. ללא זיהוי דור בקשה, callback מאוחר מהבקשה הישנה היה עלול להשלים בטעות את המעקב של הבקשה החדשה, ואף למחוק את handle של ה-timeout החדש.
+
+תיקון גרסה 1.3:
+- כל batch של בקשות HEADSET/A2DP מקבל generation ייחודי.
+- callbacks מעדכנים את מצב הבקשות רק אם ה-generation שלהם עדיין הנוכחי.
+- proxy שמגיע מ-callback של generation שפג תוקפו נסגר באמצעות closeProfileProxy במקום להישמר ב-Activity.
+- timeout ישן אינו יכול לאפס batch חדש ואינו יכול למחוק את handle של timeout חדש.
+- reset בעת סגירת Activity מבטל את כל ה-callbacks שנוצרו קודם לכן.
+- נוספו בדיקות יחידה ל-callback מאוחר ול-timeout ישן שמנסה לאפס בקשה חדשה.
+
+התיקון עוסק במרוץ של אבחון HEADSET/A2DP בלבד. הוא אינו מוסיף HFP Client, אינו יוצר חיוג/מענה ואינו מוכיח Dual-HFP או גישור שמע.
