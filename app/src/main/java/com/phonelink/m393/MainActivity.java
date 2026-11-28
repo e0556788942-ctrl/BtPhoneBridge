@@ -164,7 +164,7 @@ public class MainActivity extends Activity {
         addButton(root, "העתק דוח אבחון", v -> copyReport());
 
         TextView note = new TextView(this);
-        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.2 עוקבת גם אחר שינויי נתיב של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
+        note.setText("חשוב: זהו אבטיפוס אבחוני. הוא אינו מחייג ואינו עונה לשיחות. גרסה 1.3 עוקבת גם אחר שינויי נתיב של AudioTrack ו-AudioRecord בזמן בדיקת האפליקציה; זו עדיין אינה בדיקת גישור של שיחת HFP מהטלפון אל האוזניות.");
         note.setTextColor(0xFFFFD58A);
         note.setTextSize(14);
         note.setPadding(0, 18, 0, 18);
@@ -483,9 +483,15 @@ public class MainActivity extends Activity {
         if (!needHeadset && !needA2dp) return;
 
         profilesRequested = true;
-        profileProxyRequests.begin(needHeadset, needA2dp);
+        final long requestGeneration = profileProxyRequests.begin(needHeadset, needA2dp);
         BluetoothProfile.ServiceListener listener = new BluetoothProfile.ServiceListener() {
             @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                if (!profileProxyRequests.isCurrent(requestGeneration)) {
+                    // A callback from a timed-out/destroyed request must not
+                    // mutate a newer batch. Release its stale proxy immediately.
+                    try { adapter.closeProfileProxy(profile, proxy); } catch (Exception ignored) {}
+                    return;
+                }
                 if (profile == BluetoothProfile.HEADSET) {
                     headsetProxy = (BluetoothHeadset)proxy;
                     appendProfile("HFP Headset (הנגן מול אוזניות)", headsetProxy);
@@ -493,14 +499,15 @@ public class MainActivity extends Activity {
                     a2dpProxy = (BluetoothA2dp)proxy;
                     appendProfile("A2DP (מדיה)", a2dpProxy);
                 }
-                profileProxyRequests.complete(profile);
+                profileProxyRequests.complete(requestGeneration, profile);
                 finishProfileProxyRequestsIfIdle();
                 showReport();
             }
             @Override public void onServiceDisconnected(int profile) {
+                if (!profileProxyRequests.isCurrent(requestGeneration)) return;
                 if (profile == BluetoothProfile.HEADSET) headsetProxy = null;
                 if (profile == BluetoothProfile.A2DP) a2dpProxy = null;
-                profileProxyRequests.complete(profile);
+                profileProxyRequests.complete(requestGeneration, profile);
                 finishProfileProxyRequestsIfIdle();
                 append("שירות Bluetooth נותק: " + profile);
                 showReport();
@@ -522,7 +529,7 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception e) {
-            profileProxyRequests.reset();
+            profileProxyRequests.reset(requestGeneration);
             finishProfileProxyRequestsIfIdle();
             append("שגיאה בבקשת שירותי Bluetooth: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             return;
@@ -534,19 +541,22 @@ public class MainActivity extends Activity {
             return;
         }
 
-        profileProxyTimeout = () -> {
-            if (profileProxyRequests.hasPending()) {
-                Set<Integer> pending = profileProxyRequests.pendingProfiles();
-                profileProxyRequests.reset();
-                profilesRequested = false;
-                append("לא התקבל callback עבור שירותי Bluetooth בתוך 15 שניות: " +
-                    pending.stream().map(id -> id == BluetoothProfile.HEADSET ? "HFP Headset" :
-                        id == BluetoothProfile.A2DP ? "A2DP" : "פרופיל " + id)
-                        .collect(java.util.stream.Collectors.joining(", ")) +
-                    ". אפשר ללחוץ שוב על בדיקת מצב.");
-                showReport();
+        profileProxyTimeout = new Runnable() {
+            @Override public void run() {
+                if (profileProxyRequests.isCurrent(requestGeneration) && profileProxyRequests.hasPending()) {
+                    Set<Integer> pending = profileProxyRequests.pendingProfiles();
+                    profileProxyRequests.reset(requestGeneration);
+                    profilesRequested = false;
+                    append("לא התקבל callback עבור שירותי Bluetooth בתוך 15 שניות: " +
+                        pending.stream().map(id -> id == BluetoothProfile.HEADSET ? "HFP Headset" :
+                            id == BluetoothProfile.A2DP ? "A2DP" : "פרופיל " + id)
+                            .collect(java.util.stream.Collectors.joining(", ")) +
+                        ". אפשר ללחוץ שוב על בדיקת מצב.");
+                    showReport();
+                }
+                // An older timeout must not clear a newer batch's timeout handle.
+                if (profileProxyTimeout == this) profileProxyTimeout = null;
             }
-            profileProxyTimeout = null;
         };
         mainHandler.postDelayed(profileProxyTimeout, 15000);
     }
